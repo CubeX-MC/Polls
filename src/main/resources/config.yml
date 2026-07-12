@@ -1,0 +1,19 @@
+# Polls 配置
+
+# 投票数据保留天数（到期自动删除）
+data-retention-days: 30
+
+# 管理员权限节点（持有此权限可管理议题）
+admin-permission: polls.admin
+
+# 每个议题最多可添加的选项数
+max-options: 9
+
+# 提交议题时标题最大字符数
+max-title-length: 40
+
+# 提交议题时描述最大字符数
+max-description-length: 200
+
+# 每个选项描述最大字符数
+max-option-desc-length: 100

@@ -1,0 +1,23 @@
+name: Polls
+version: 1.0.0
+main: com.polls.PollsPlugin
+api-version: '1.21'
+folia-supported: true
+description: 玩家民意收集插件
+authors: [CubeXMC]
+
+commands:
+  polls:
+    description: 打开投票主界面
+    usage: /polls
+
+permissions:
+  polls.submit:
+    description: 提交投票议题
+    default: true
+  polls.vote:
+    description: 参与投票
+    default: true
+  polls.admin:
+    description: 管理员权限：管理议题（删除/修改内容/修改时间）
+    default: op
