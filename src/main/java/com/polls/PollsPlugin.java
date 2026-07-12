@@ -3,6 +3,7 @@ package com.polls;
 import com.polls.db.Database;
 import com.polls.db.PollCache;
 import com.polls.gui.MainGui;
+import org.bstats.bukkit.Metrics;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -36,6 +37,10 @@ public class PollsPlugin extends JavaPlugin implements CommandExecutor {
         scheduler.start();
 
         getCommand("polls").setExecutor(this);
+
+        // bStats metrics - replace 0 with your plugin ID from bstats.org
+        new Metrics(this, 0);
+
         getLogger().info("Polls 已启动。");
     }
 
