@@ -38,8 +38,7 @@ public class PollsPlugin extends JavaPlugin implements CommandExecutor {
 
         getCommand("polls").setExecutor(this);
 
-        // bStats metrics - replace 0 with your plugin ID from bstats.org
-        new Metrics(this, 0);
+        new Metrics(this, 32574);
 
         getLogger().info("Polls 已启动。");
     }
