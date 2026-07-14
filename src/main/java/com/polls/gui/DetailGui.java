@@ -80,7 +80,9 @@ public class DetailGui implements Listener {
         int votedOptionId = -1;
         try {
             votedOptionId = plugin.getDatabase().getPlayerVote(poll.getId(), player.getUniqueId());
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            plugin.getLogger().warning("查询投票状态失败: " + e.getMessage());
+        }
 
         // 选项（槽位 9-17，最多9个）
         List<PollOption> opts = poll.getOptions();
@@ -172,6 +174,10 @@ public class DetailGui implements Listener {
 
         // 选项槽位 9-17
         if (slot >= 9 && slot <= 17 && poll.isActive()) {
+            if (!player.hasPermission("polls.vote")) {
+                player.sendMessage(color("&c你没有投票权限。"));
+                return;
+            }
             int idx = slot - 9;
             List<PollOption> opts = poll.getOptions();
             if (idx >= opts.size()) return;
@@ -183,9 +189,7 @@ public class DetailGui implements Listener {
                 }
                 PollOption chosen = opts.get(idx);
                 plugin.getDatabase().castVote(poll.getId(), player.getUniqueId(), chosen.getId());
-                chosen.incrementVoteCount();
                 player.sendMessage(color("&a已投票：&f" + chosen.getLabel()));
-                // 刷新界面
                 poll = plugin.getDatabase().loadPoll(poll.getId());
                 populate();
             } catch (Exception e) {
