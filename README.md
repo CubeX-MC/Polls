@@ -1,6 +1,6 @@
 # Polls
 
-玩家民意收集插件，适配 Folia。
+玩家民意收集插件，适配 Bukkit / Spigot / Paper / Folia。
 
 开发团队：CubeXMC
 
@@ -126,3 +126,16 @@ max-option-desc-length: 100
 1. 将 `Polls-*.jar` 放入服务器 `plugins/` 目录
 2. 重启服务器
 3. 按需修改 `plugins/Polls/config.yml`
+
+---
+
+## 服务端兼容性
+
+| 服务端 | 支持情况 |
+|--------|---------|
+| Bukkit 1.21+ | ✅ |
+| Spigot 1.21+ | ✅ |
+| Paper 1.21+ | ✅（自动启用 Adventure API 和性能优化） |
+| Folia 1.21+ | ✅（区域线程支持） |
+
+插件在运行时自动检测服务端类型，Paper 环境下启用 Adventure API 和异步调度器优化，其他环境使用 Bukkit 兼容模式。
