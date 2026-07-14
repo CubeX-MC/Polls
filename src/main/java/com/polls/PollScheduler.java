@@ -7,19 +7,21 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.sql.SQLException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public class PollScheduler {
 
     private final PollsPlugin plugin;
+    private final Set<Integer> notifiedPollIds = new HashSet<>();
 
     public PollScheduler(PollsPlugin plugin) {
         this.plugin = plugin;
     }
 
     public void start() {
-        // 每分钟检查一次：议题结束通知 + 过期清理
         plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(plugin, t -> {
             checkEnded();
             cleanExpired();
@@ -27,12 +29,10 @@ public class PollScheduler {
     }
 
     private void checkEnded() {
-        PollCache cache = plugin.getPollCache();
-        List<Poll> polls = cache.getAll();
+        List<Poll> polls = plugin.getPollCache().getAll();
         for (Poll poll : polls) {
-            // 刚刚结束：结束时间在过去60秒内
-            long now = System.currentTimeMillis();
-            if (!poll.isActive() && now - poll.getEndsAt() < 60_000) {
+            if (!poll.isActive() && !notifiedPollIds.contains(poll.getId())) {
+                notifiedPollIds.add(poll.getId());
                 notifyAdmins(poll);
             }
         }
