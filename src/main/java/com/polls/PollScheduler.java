@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class PollScheduler {
 
@@ -63,6 +64,11 @@ public class PollScheduler {
             int deleted = plugin.getDatabase().deleteExpiredPolls(cutoff);
             if (deleted > 0) {
                 plugin.getPollCache().reload();
+                // 清除已删除 poll 的已通知记录，避免内存泄漏
+                Set<Integer> activeIds = plugin.getPollCache().getAll()
+                        .stream().map(Poll::getId)
+                        .collect(Collectors.toSet());
+                notifiedPollIds.retainAll(activeIds);
                 plugin.getLogger().info("清理过期议题 " + deleted + " 条");
             }
         } catch (SQLException e) {
