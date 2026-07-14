@@ -133,14 +133,14 @@ public class ManageGui implements Listener {
                         if (msg.length() > max) { send("&c标题过长"); open(); return; }
                         poll.setTitle(msg);
                         plugin.getDatabase().updatePollTitleDesc(poll.getId(), poll.getTitle(), poll.getDescription());
-                        plugin.getPollCache().reload();
+                        plugin.getPollCache().updatePoll(poll);
                         send("&a标题已更新为: &f" + msg);
                         open();
                     }
                     case "desc" -> {
                         poll.setDescription(msg);
                         plugin.getDatabase().updatePollTitleDesc(poll.getId(), poll.getTitle(), poll.getDescription());
-                        plugin.getPollCache().reload();
+                        plugin.getPollCache().updatePoll(poll);
                         send("&a描述已更新。");
                         open();
                     }
@@ -150,14 +150,14 @@ public class ManageGui implements Listener {
                         long newEndsAt = System.currentTimeMillis() + millis;
                         poll.setEndsAt(newEndsAt);
                         plugin.getDatabase().updatePollEndsAt(poll.getId(), newEndsAt);
-                        plugin.getPollCache().reload();
+                        plugin.getPollCache().updatePoll(poll);
                         send("&a截止时间已更新，剩余: &f" + DurationParser.format(millis));
                         open();
                     }
                     case "confirm_delete" -> {
                         if (!msg.equals("DELETE")) { send("&7已取消删除。"); open(); return; }
                         plugin.getDatabase().deletePoll(poll.getId());
-                        plugin.getPollCache().reload();
+                        plugin.getPollCache().removePoll(poll.getId());
                         send("&a议题已删除。");
                         new MainGui(plugin, player).open();
                     }
