@@ -14,6 +14,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
@@ -73,7 +74,7 @@ public class SubmitFlow implements Listener {
 
     private void startStep2() {
         step = 2;
-        send("&e请输入&6截止时长&e，格式：&f30m &7/ &f12h &7/ &f3d &7/ &f7d");
+        send("&e请输入&6截止时长&e，格式：&f30m &7/ &f12h &7/ &f3d &7（仅支持单个单位）");
     }
 
     private void openOptionManager() {
@@ -211,6 +212,13 @@ public class SubmitFlow implements Listener {
         // 只有在 step==3 时关闭才视为放弃（step 4/5 是手动关的）
         if (step == 3) {
             abort();
+        }
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        if (event.getPlayer().getUniqueId().equals(player.getUniqueId())) {
+            HandlerList.unregisterAll(this);
         }
     }
 

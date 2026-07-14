@@ -61,4 +61,7 @@ public class PollsPlugin extends JavaPlugin implements CommandExecutor {
 
     public Database getDatabase() { return database; }
     public PollCache getPollCache() { return pollCache; }
+    public String getAdminPermission() {
+        return getConfig().getString("admin-permission", "polls.admin");
+    }
 }

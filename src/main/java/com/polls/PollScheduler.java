@@ -3,6 +3,7 @@ package com.polls;
 import com.polls.db.Database;
 import com.polls.db.PollCache;
 import com.polls.model.Poll;
+import com.polls.model.PollOption;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -34,7 +35,14 @@ public class PollScheduler {
         for (Poll poll : polls) {
             if (!poll.isActive() && !notifiedPollIds.contains(poll.getId())) {
                 notifiedPollIds.add(poll.getId());
-                notifyAdmins(poll);
+                // 从 DB 加载最新数据，确保票数准确
+                try {
+                    Poll fresh = plugin.getDatabase().loadPoll(poll.getId());
+                    if (fresh != null) notifyAdmins(fresh);
+                } catch (SQLException e) {
+                    plugin.getLogger().warning("加载议题数据失败: " + e.getMessage());
+                    notifyAdmins(poll); // 降级：用缓存数据
+                }
             }
         }
     }
@@ -51,7 +59,7 @@ public class PollScheduler {
         });
         String msg = sb.toString();
         for (Player p : Bukkit.getOnlinePlayers()) {
-            if (p.hasPermission("polls.admin")) {
+            if (p.hasPermission(plugin.getAdminPermission())) {
                 p.sendMessage(msg);
             }
         }

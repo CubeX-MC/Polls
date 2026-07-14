@@ -13,6 +13,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
@@ -156,6 +157,13 @@ public class MainGui implements Listener {
     public void onClose(InventoryCloseEvent event) {
         if (event.getPlayer().getUniqueId().equals(player.getUniqueId())
                 && event.getInventory().equals(inv)) {
+            HandlerList.unregisterAll(this);
+        }
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        if (event.getPlayer().getUniqueId().equals(player.getUniqueId())) {
             HandlerList.unregisterAll(this);
         }
     }

@@ -14,6 +14,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
@@ -96,7 +97,7 @@ public class ManageGui implements Listener {
         switch (slot) {
             case SLOT_EDIT_TITLE -> startInput("title", "&e请输入新的议题标题：");
             case SLOT_EDIT_DESC  -> startInput("desc",  "&e请输入新的议题描述（留空则清除）：");
-            case SLOT_EDIT_TIME  -> startInput("time",  "&e请输入新的截止时长（如 &f3d&e / &f12h&e）：");
+            case SLOT_EDIT_TIME  -> startInput("time",  "&e请输入新的截止时长（如 &f3d&e / &f12h&e / &f30m&e，仅支持单个单位）：");
             case SLOT_DELETE     -> startInput("confirm_delete", "&c输入 &fDELETE &c确认删除议题，输入其他取消：");
             case SLOT_BACK       -> goBack();
         }
@@ -133,14 +134,14 @@ public class ManageGui implements Listener {
                         if (msg.length() > max) { send("&c标题过长"); open(); return; }
                         poll.setTitle(msg);
                         plugin.getDatabase().updatePollTitleDesc(poll.getId(), poll.getTitle(), poll.getDescription());
-                        plugin.getPollCache().updatePoll(poll);
+                        refreshCache();
                         send("&a标题已更新为: &f" + msg);
                         open();
                     }
                     case "desc" -> {
                         poll.setDescription(msg);
                         plugin.getDatabase().updatePollTitleDesc(poll.getId(), poll.getTitle(), poll.getDescription());
-                        plugin.getPollCache().updatePoll(poll);
+                        refreshCache();
                         send("&a描述已更新。");
                         open();
                     }
@@ -150,7 +151,7 @@ public class ManageGui implements Listener {
                         long newEndsAt = System.currentTimeMillis() + millis;
                         poll.setEndsAt(newEndsAt);
                         plugin.getDatabase().updatePollEndsAt(poll.getId(), newEndsAt);
-                        plugin.getPollCache().updatePoll(poll);
+                        refreshCache();
                         send("&a截止时间已更新，剩余: &f" + DurationParser.format(millis));
                         open();
                     }
@@ -177,6 +178,13 @@ public class ManageGui implements Listener {
         if (pendingAction == null) HandlerList.unregisterAll(this);
     }
 
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        if (event.getPlayer().getUniqueId().equals(player.getUniqueId())) {
+            HandlerList.unregisterAll(this);
+        }
+    }
+
     private void goBack() {
         HandlerList.unregisterAll(this);
         player.closeInventory();
@@ -186,5 +194,19 @@ public class ManageGui implements Listener {
 
     private void send(String msg) {
         player.sendMessage(color(msg));
+    }
+
+    /** 从 DB 重新加载 poll（含最新票数）并更新缓存 */
+    private void refreshCache() {
+        try {
+            com.polls.model.Poll fresh = plugin.getDatabase().loadPoll(poll.getId());
+            if (fresh != null) {
+                poll = fresh;
+                plugin.getPollCache().updatePoll(fresh);
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("刷新议题缓存失败: " + e.getMessage());
+            plugin.getPollCache().updatePoll(poll);
+        }
     }
 }

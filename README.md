@@ -123,6 +123,6 @@ max-option-desc-length: 100
 
 ## 安装
 
-1. 将 `Polls-1.0.0.jar` 放入服务器 `plugins/` 目录
+1. 将 `Polls-*.jar` 放入服务器 `plugins/` 目录
 2. 重启服务器
 3. 按需修改 `plugins/Polls/config.yml`

@@ -13,6 +13,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
@@ -96,7 +97,7 @@ public class DetailGui implements Listener {
         inv.setItem(BACK_SLOT, makeItem(Material.ARROW, "&7← 返回列表", List.of()));
 
         // 管理员管理按钮
-        if (player.hasPermission("polls.admin")) {
+        if (player.hasPermission(plugin.getAdminPermission())) {
             inv.setItem(MANAGE_SLOT, makeItem(Material.NETHER_STAR, "&c管理此议题",
                     List.of(color("&7修改/删除议题"), color("&7修改截止时间"))));
         }
@@ -164,7 +165,7 @@ public class DetailGui implements Listener {
             goBack(); return;
         }
 
-        if (slot == MANAGE_SLOT && player.hasPermission("polls.admin")) {
+        if (slot == MANAGE_SLOT && player.hasPermission(plugin.getAdminPermission())) {
             HandlerList.unregisterAll(this);
             player.closeInventory();
             plugin.getServer().getGlobalRegionScheduler().run(plugin,
@@ -203,6 +204,13 @@ public class DetailGui implements Listener {
     public void onClose(InventoryCloseEvent event) {
         if (event.getPlayer().getUniqueId().equals(player.getUniqueId())
                 && event.getInventory().equals(inv)) {
+            HandlerList.unregisterAll(this);
+        }
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        if (event.getPlayer().getUniqueId().equals(player.getUniqueId())) {
             HandlerList.unregisterAll(this);
         }
     }
