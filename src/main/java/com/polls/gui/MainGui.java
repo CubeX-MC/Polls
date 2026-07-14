@@ -2,11 +2,10 @@ package com.polls.gui;
 
 import com.polls.PollsPlugin;
 import com.polls.model.Poll;
+import com.polls.model.PollOption;
 import com.polls.util.DurationParser;
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -16,10 +15,13 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.polls.gui.GuiUtils.color;
+import static com.polls.gui.GuiUtils.makeItem;
+import static com.polls.gui.GuiUtils.wrapText;
 
 /**
  * 主界面：商店风格，按状态分区展示所有议题
@@ -101,11 +103,7 @@ public class MainGui implements Listener {
         Material mat = active ? Material.LIME_DYE : Material.GRAY_DYE;
         List<String> lore = new ArrayList<>();
         if (!poll.getDescription().isBlank()) {
-            // 自动折行（每行最多 30 字符）
-            String desc = poll.getDescription();
-            for (int i = 0; i < desc.length(); i += 30) {
-                lore.add(color("&7" + desc.substring(i, Math.min(i + 30, desc.length()))));
-            }
+            lore.addAll(wrapText(poll.getDescription(), 30, "&7"));
             lore.add(" ");
         }
         lore.add(color("&8提交者: &f" + poll.getCreatorName()));
@@ -114,7 +112,7 @@ public class MainGui implements Listener {
         } else {
             lore.add(color("&7已结束"));
         }
-        int total = poll.getOptions().stream().mapToInt(o -> o.getVoteCount()).sum();
+        int total = poll.getOptions().stream().mapToInt(PollOption::getVoteCount).sum();
         lore.add(color("&8总票数: &f" + total));
         lore.add(" ");
         lore.add(color(active ? "&e▶ 点击参与投票" : "&7▶ 点击查看结果"));
@@ -167,22 +165,5 @@ public class MainGui implements Listener {
         player.closeInventory();
         plugin.getServer().getGlobalRegionScheduler().run(plugin,
                 t -> new DetailGui(plugin, player, poll).open());
-    }
-
-    // ─── 工具 ───
-
-    private String color(String s) {
-        return ChatColor.translateAlternateColorCodes('&', s);
-    }
-
-    private ItemStack makeItem(Material mat, String name, List<String> lore) {
-        ItemStack item = new ItemStack(mat);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(LegacyComponentSerializer.legacyAmpersand().deserialize(name));
-        List<Component> loreComp = new ArrayList<>();
-        for (String l : lore) loreComp.add(LegacyComponentSerializer.legacySection().deserialize(l));
-        meta.lore(loreComp);
-        item.setItemMeta(meta);
-        return item;
     }
 }
