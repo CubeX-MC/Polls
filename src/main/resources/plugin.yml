@@ -2,6 +2,7 @@ name: Polls
 version: '${project.version}'
 main: com.polls.PollsPlugin
 api-version: '1.21'
+# Paper API 作为软依赖，运行时自动检测并启用
 folia-supported: true
 description: 玩家民意收集插件
 authors: [CubeXMC]
