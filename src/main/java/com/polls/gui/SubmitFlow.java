@@ -2,8 +2,9 @@ package com.polls.gui;
 
 import com.polls.PollsPlugin;
 import com.polls.util.DurationParser;
-import net.kyori.adventure.text.Component;
+import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -12,13 +13,14 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.polls.gui.GuiUtils.color;
+import static com.polls.gui.GuiUtils.makeItem;
 
 /**
  * 引导式提交议题流程：
@@ -129,10 +131,12 @@ public class SubmitFlow implements Listener {
     // ─── 事件处理 ───
 
     @EventHandler
-    public void onChat(AsyncPlayerChatEvent event) {
+    public void onChat(AsyncChatEvent event) {
         if (!event.getPlayer().getUniqueId().equals(player.getUniqueId())) return;
+        // step 3 是 GUI 阶段，不需要处理聊天输入
+        if (step == 3) return;
         event.setCancelled(true);
-        String msg = event.getMessage().trim();
+        String msg = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
 
         if (msg.equalsIgnoreCase("cancel")) { abort(); return; }
 
@@ -243,20 +247,5 @@ public class SubmitFlow implements Listener {
 
     private void send(String msg) {
         player.sendMessage(color(msg));
-    }
-
-    private String color(String s) {
-        return org.bukkit.ChatColor.translateAlternateColorCodes('&', s);
-    }
-
-    private ItemStack makeItem(Material mat, String name, List<String> lore) {
-        ItemStack item = new ItemStack(mat);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(LegacyComponentSerializer.legacyAmpersand().deserialize(name));
-        List<Component> loreComp = new ArrayList<>();
-        for (String l : lore) loreComp.add(LegacyComponentSerializer.legacySection().deserialize(l));
-        meta.lore(loreComp);
-        item.setItemMeta(meta);
-        return item;
     }
 }

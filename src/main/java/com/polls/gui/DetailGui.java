@@ -4,10 +4,8 @@ import com.polls.PollsPlugin;
 import com.polls.model.Poll;
 import com.polls.model.PollOption;
 import com.polls.util.DurationParser;
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -17,10 +15,13 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.polls.gui.GuiUtils.color;
+import static com.polls.gui.GuiUtils.makeItem;
+import static com.polls.gui.GuiUtils.wrapText;
 
 /**
  * 议题详情 + 投票界面
@@ -61,10 +62,7 @@ public class DetailGui implements Listener {
         // 议题信息格（槽位4）
         List<String> infoLore = new ArrayList<>();
         if (!poll.getDescription().isBlank()) {
-            String desc = poll.getDescription();
-            for (int i = 0; i < desc.length(); i += 30) {
-                infoLore.add(color("&f" + desc.substring(i, Math.min(i + 30, desc.length()))));
-            }
+            infoLore.addAll(wrapText(poll.getDescription(), 30, "&f"));
             infoLore.add(" ");
         }
         infoLore.add(color("&8提交者: &7" + poll.getCreatorName()));
@@ -107,10 +105,7 @@ public class DetailGui implements Listener {
 
         // 选项描述
         if (!opt.getDescription().isBlank()) {
-            String desc = opt.getDescription();
-            for (int i = 0; i < desc.length(); i += 30) {
-                lore.add(color("&7" + desc.substring(i, Math.min(i + 30, desc.length()))));
-            }
+            lore.addAll(wrapText(opt.getDescription(), 30, "&7"));
             lore.add(" ");
         }
 
@@ -213,20 +208,5 @@ public class DetailGui implements Listener {
         player.closeInventory();
         plugin.getServer().getGlobalRegionScheduler().run(plugin,
                 t -> new MainGui(plugin, player).open());
-    }
-
-    private String color(String s) {
-        return ChatColor.translateAlternateColorCodes('&', s);
-    }
-
-    private ItemStack makeItem(Material mat, String name, List<String> lore) {
-        ItemStack item = new ItemStack(mat);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(LegacyComponentSerializer.legacyAmpersand().deserialize(name));
-        List<Component> loreComp = new ArrayList<>();
-        for (String l : lore) loreComp.add(LegacyComponentSerializer.legacySection().deserialize(l));
-        meta.lore(loreComp);
-        item.setItemMeta(meta);
-        return item;
     }
 }
