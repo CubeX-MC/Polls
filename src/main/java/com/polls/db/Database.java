@@ -218,16 +218,26 @@ public class Database {
         }
     }
 
-    public void castVote(int pollId, UUID player, int optionId) throws SQLException {
+    /**
+     * 原子投票：INSERT OR IGNORE 避免 check-then-act 竞态。
+     * 若行已存在（重复投票）返回 false，成功返回 true。
+     */
+    public boolean castVote(int pollId, UUID player, int optionId) throws SQLException {
         connection.setAutoCommit(false);
         try {
-            String insert = "INSERT INTO poll_votes (poll_id, player_uuid, option_id, voted_at) VALUES (?,?,?,?)";
+            String insert = "INSERT OR IGNORE INTO poll_votes (poll_id, player_uuid, option_id, voted_at) VALUES (?,?,?,?)";
+            int inserted;
             try (PreparedStatement ps = connection.prepareStatement(insert)) {
                 ps.setInt(1, pollId);
                 ps.setString(2, player.toString());
                 ps.setInt(3, optionId);
                 ps.setLong(4, System.currentTimeMillis());
-                ps.executeUpdate();
+                inserted = ps.executeUpdate();
+            }
+            if (inserted == 0) {
+                // 主键冲突：该玩家已投过票，静默回滚
+                connection.rollback();
+                return false;
             }
             String update = "UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = ?";
             try (PreparedStatement ps = connection.prepareStatement(update)) {
@@ -235,6 +245,7 @@ public class Database {
                 ps.executeUpdate();
             }
             connection.commit();
+            return true;
         } catch (SQLException e) {
             connection.rollback();
             throw e;

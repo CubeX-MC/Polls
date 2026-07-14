@@ -183,12 +183,12 @@ public class DetailGui implements Listener {
             if (idx >= opts.size()) return;
 
             try {
-                if (plugin.getDatabase().hasVoted(poll.getId(), player.getUniqueId())) {
+                PollOption chosen = opts.get(idx);
+                boolean voted = plugin.getDatabase().castVote(poll.getId(), player.getUniqueId(), chosen.getId());
+                if (!voted) {
                     player.sendMessage(color("&c你已经投过票了，不可更改。"));
                     return;
                 }
-                PollOption chosen = opts.get(idx);
-                plugin.getDatabase().castVote(poll.getId(), player.getUniqueId(), chosen.getId());
                 player.sendMessage(color("&a已投票：&f" + chosen.getLabel()));
                 poll = plugin.getDatabase().loadPoll(poll.getId());
                 populate();
