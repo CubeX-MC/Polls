@@ -7,7 +7,9 @@ import com.polls.model.PollOption;
 import java.io.File;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class Database {
@@ -70,6 +72,10 @@ public class Database {
                     FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE
                 )
             """);
+            // 性能索引
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_poll_votes_player ON poll_votes(player_uuid)");
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_polls_ends_at ON polls(ends_at)");
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_poll_options_poll_id ON poll_options(poll_id)");
         }
     }
 
@@ -114,10 +120,34 @@ public class Database {
                 polls.add(mapPoll(rs));
             }
         }
-        for (Poll poll : polls) {
-            loadOptions(poll);
+        if (!polls.isEmpty()) {
+            loadAllOptions(polls);
         }
         return polls;
+    }
+
+    private void loadAllOptions(List<Poll> polls) throws SQLException {
+        String sql = "SELECT * FROM poll_options ORDER BY poll_id, slot";
+        try (Statement st = connection.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            Map<Integer, Poll> pollMap = new LinkedHashMap<>();
+            for (Poll p : polls) pollMap.put(p.getId(), p);
+
+            while (rs.next()) {
+                int pollId = rs.getInt("poll_id");
+                Poll poll = pollMap.get(pollId);
+                if (poll != null) {
+                    poll.getOptions().add(new PollOption(
+                            rs.getInt("id"),
+                            pollId,
+                            rs.getInt("slot"),
+                            rs.getString("label"),
+                            rs.getString("description"),
+                            rs.getInt("vote_count")
+                    ));
+                }
+            }
+        }
     }
 
     public Poll loadPoll(int id) throws SQLException {
@@ -213,7 +243,7 @@ public class Database {
         }
     }
 
-    // ─── 宝石管理 ───
+    // ─── 议题管理 ───
 
     public void updatePollTitleDesc(int pollId, String title, String description) throws SQLException {
         String sql = "UPDATE polls SET title = ?, description = ? WHERE id = ?";
@@ -255,6 +285,8 @@ public class Database {
     public void close() {
         try {
             if (connection != null && !connection.isClosed()) connection.close();
-        } catch (SQLException ignored) {}
+        } catch (SQLException e) {
+            plugin.getLogger().warning("关闭数据库连接失败: " + e.getMessage());
+        }
     }
 }
