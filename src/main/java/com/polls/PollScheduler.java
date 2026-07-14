@@ -50,17 +50,17 @@ public class PollScheduler {
     private void notifyAdmins(Poll poll) {
         int totalVotes = poll.getOptions().stream().mapToInt(o -> o.getVoteCount()).sum();
         StringBuilder sb = new StringBuilder();
-        sb.append("§8[§6Polls§8] §e议题已结束: §f").append(poll.getTitle())
-          .append(" §8| §7总票数: §f").append(totalVotes).append(" §8|");
+        sb.append("&8[&6Polls&8] &e议题已结束: &f").append(poll.getTitle())
+          .append(" &8| &7总票数: &f").append(totalVotes).append(" &8|");
         poll.getOptions().forEach(opt -> {
             double pct = totalVotes > 0 ? (opt.getVoteCount() * 100.0 / totalVotes) : 0;
-            sb.append(" §a").append(opt.getLabel()).append(": §f").append(opt.getVoteCount())
-              .append(" §7(").append(String.format("%.1f", pct)).append("%)");
+            sb.append(" &a").append(opt.getLabel()).append(": &f").append(opt.getVoteCount())
+              .append(" &7(").append(String.format("%.1f", pct)).append("%)");
         });
         String msg = sb.toString();
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (p.hasPermission(plugin.getAdminPermission())) {
-                p.sendMessage(msg);
+                plugin.getPlatformAdapter().sendMessage(p, msg);
             }
         }
     }
