@@ -1,6 +1,7 @@
 package com.polls.gui;
 
 import com.polls.PollsPlugin;
+import com.polls.model.Poll;
 import com.polls.util.DurationParser;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -32,8 +33,6 @@ import static com.polls.gui.GuiUtils.makeItem;
  * Step 5（子流程）- 等待输入选项描述
  */
 public class SubmitFlow implements Listener {
-
-    private static final int MAX_OPTIONS = 9;
 
     private final PollsPlugin plugin;
     private final Player player;
@@ -101,7 +100,8 @@ public class SubmitFlow implements Listener {
         }
 
         // 添加按钮
-        if (options.size() < MAX_OPTIONS) {
+        int maxOptions = plugin.getConfig().getInt("max-options", 9);
+        if (options.size() < maxOptions) {
             optionInv.setItem(27, makeItem(Material.LIME_DYE, "&a+ 添加选项",
                     List.of(color("&7点击添加新选项"))));
         }
@@ -165,7 +165,7 @@ public class SubmitFlow implements Listener {
                     plugin.getServer().getGlobalRegionScheduler().run(plugin, t -> openOptionManager());
                     return;
                 }
-                int max = plugin.getConfig().getInt("max-title-length", 40);
+                int max = plugin.getConfig().getInt("max-option-label-length", 40);
                 if (msg.isEmpty()) { send("&c选项名称不能为空"); return; }
                 if (msg.length() > max) { send("&c选项名称过长"); return; }
                 pendingOptionLabel = msg;
@@ -228,7 +228,9 @@ public class SubmitFlow implements Listener {
                 for (int i = 0; i < options.size(); i++) {
                     plugin.getDatabase().insertOption(pollId, i, options.get(i)[0], options.get(i)[1]);
                 }
-                plugin.getPollCache().reload();
+                // 增量更新缓存，避免全量重载
+                Poll newPoll = plugin.getDatabase().loadPoll(pollId);
+                if (newPoll != null) plugin.getPollCache().addPoll(newPoll);
                 send("&a议题提交成功！使用 &e/polls &a查看。");
             } catch (Exception e) {
                 send("&c提交失败，请联系管理员。");

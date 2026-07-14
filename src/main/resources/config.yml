@@ -12,6 +12,9 @@ max-options: 9
 # 提交议题时标题最大字符数
 max-title-length: 40
 
+# 选项名称最大字符数
+max-option-label-length: 40
+
 # 提交议题时描述最大字符数
 max-description-length: 200
 
