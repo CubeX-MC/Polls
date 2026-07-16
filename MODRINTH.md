@@ -69,10 +69,10 @@ The plugin auto-detects the server type at startup. On Paper, Adventure API and 
 
 ## 安装 | Installation
 
-1. 将 `Polls-*.jar` 放入 `plugins/` 目录  
+1. 将 `Polls-*.jar` 放入 `plugins/` 目录
    Drop `Polls-*.jar` into your `plugins/` folder
 2. 重启服务器 | Restart the server
-3. 按需编辑 `plugins/Polls/config.yml`  
+3. 按需编辑 `plugins/Polls/config.yml`
    Edit `plugins/Polls/config.yml` as needed
 
 ---
