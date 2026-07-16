@@ -13,14 +13,20 @@ public class DurationParser {
         if (input == null || input.isBlank()) return -1;
         Matcher m = PATTERN.matcher(input.trim().toLowerCase());
         if (!m.matches()) return -1;
-        long value = Long.parseLong(m.group(1));
-        return switch (m.group(2)) {
-            case "s" -> value * 1000L;
-            case "m" -> value * 60_000L;
-            case "h" -> value * 3_600_000L;
-            case "d" -> value * 86_400_000L;
-            default  -> -1;
-        };
+        try {
+            long value = Long.parseLong(m.group(1));
+            if (value <= 0) return -1;
+            long multiplier = switch (m.group(2)) {
+                case "s" -> 1_000L;
+                case "m" -> 60_000L;
+                case "h" -> 3_600_000L;
+                case "d" -> 86_400_000L;
+                default -> -1L;
+            };
+            return multiplier < 0 ? -1 : Math.multiplyExact(value, multiplier);
+        } catch (NumberFormatException | ArithmeticException e) {
+            return -1;
+        }
     }
 
     /** 将毫秒格式化为可读字符串，如 "2天3小时" */

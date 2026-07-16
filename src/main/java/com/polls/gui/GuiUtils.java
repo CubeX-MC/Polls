@@ -1,7 +1,5 @@
 package com.polls.gui;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
@@ -18,13 +16,13 @@ public final class GuiUtils {
         return ChatColor.translateAlternateColorCodes('&', s);
     }
 
+    @SuppressWarnings("deprecation")
     public static ItemStack makeItem(Material mat, String name, List<String> lore) {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(LegacyComponentSerializer.legacyAmpersand().deserialize(name));
-        List<Component> loreComp = new ArrayList<>();
-        for (String l : lore) loreComp.add(LegacyComponentSerializer.legacySection().deserialize(l));
-        meta.lore(loreComp);
+        if (meta == null) return item;
+        meta.setDisplayName(color(name));
+        meta.setLore(new ArrayList<>(lore));
         item.setItemMeta(meta);
         return item;
     }

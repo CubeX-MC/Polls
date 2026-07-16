@@ -4,7 +4,6 @@ import com.polls.PollsPlugin;
 import com.polls.model.Poll;
 import com.polls.model.PollOption;
 import com.polls.util.DurationParser;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -35,8 +34,14 @@ public class DetailGui implements Listener {
 
     private final PollsPlugin plugin;
     private final Player player;
+    private final int pollId;
     private Poll poll;
     private Inventory inv;
+    private boolean votePending;
+    private boolean dataLoaded;
+    private int votedOptionId = -1;
+    private Runnable removeCacheListener = () -> {};
+    private volatile boolean open;
 
     private static final int BACK_SLOT   = 27;
     private static final int MANAGE_SLOT = 35;
@@ -45,14 +50,72 @@ public class DetailGui implements Listener {
         this.plugin = plugin;
         this.player = player;
         this.poll = poll;
+        this.pollId = poll.getId();
     }
 
     public void open() {
-        inv = Bukkit.createInventory(null, 36,
-                LegacyComponentSerializer.legacyAmpersand().deserialize("&8[ &6" + poll.getTitle() + " &8]"));
-        populate();
+        inv = Bukkit.createInventory(null, 36, color("&8[ &6议题详情 &8]"));
+        showLoading();
+        open = true;
+        removeCacheListener = plugin.getPollCache().addChangeListener(this::onCacheChanged);
         Bukkit.getPluginManager().registerEvents(this, plugin);
         player.openInventory(inv);
+        loadLatest();
+    }
+
+    private void showLoading() {
+        inv.clear();
+        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, "&8 ", List.of());
+        for (int i = 0; i < 36; i++) inv.setItem(i, filler);
+        inv.setItem(4, makeItem(Material.BOOK, "&e&l" + poll.getTitle(), List.of()));
+        inv.setItem(13, makeItem(Material.CLOCK, "&e正在读取最新票数...", List.of()));
+        inv.setItem(BACK_SLOT, makeItem(Material.ARROW, "&7← 返回列表", List.of()));
+    }
+
+    private void loadLatest() {
+        var playerId = player.getUniqueId();
+        plugin.getPlatformAdapter().runAsync(() -> {
+            try {
+                Poll fresh = plugin.getDatabase().loadPoll(pollId);
+                int playerVote = fresh == null
+                        ? -1
+                        : plugin.getDatabase().getPlayerVote(pollId, playerId);
+                if (fresh != null) {
+                    plugin.getPollCache().updateVoteSnapshot(fresh);
+                }
+                plugin.getPlatformAdapter().runForPlayer(player, () -> {
+                    if (!isViewing()) return;
+                    if (fresh == null) {
+                        send("&c该议题已不存在。");
+                        goBack();
+                        return;
+                    }
+                    Poll latest = plugin.getPollCache().getById(pollId);
+                    poll = latest != null ? latest : fresh;
+                    votedOptionId = playerVote;
+                    dataLoaded = true;
+                    populate();
+                });
+            } catch (Exception e) {
+                plugin.getLogger().warning("加载议题详情失败: " + e.getMessage());
+                plugin.getPlatformAdapter().runForPlayer(player, () -> {
+                    if (!isViewing()) return;
+                    inv.setItem(13, makeItem(Material.BARRIER, "&c票数加载失败",
+                            List.of(color("&7请返回后重试"))));
+                });
+            }
+        });
+    }
+
+    private void onCacheChanged() {
+        if (!open) return;
+        plugin.getPlatformAdapter().runForPlayer(player, () -> {
+            if (!isViewing() || !dataLoaded || votePending) return;
+            Poll latest = plugin.getPollCache().getById(pollId);
+            if (latest == null) return;
+            poll = latest;
+            populate();
+        });
     }
 
     private void populate() {
@@ -76,14 +139,6 @@ public class DetailGui implements Listener {
         int totalVotes = poll.getOptions().stream().mapToInt(PollOption::getVoteCount).sum();
         infoLore.add(color("&8总票数: &f" + totalVotes));
         inv.setItem(4, makeItem(Material.BOOK, "&e&l" + poll.getTitle(), infoLore));
-
-        // 获取玩家已投选项
-        int votedOptionId = -1;
-        try {
-            votedOptionId = plugin.getDatabase().getPlayerVote(poll.getId(), player.getUniqueId());
-        } catch (Exception e) {
-            plugin.getLogger().warning("查询投票状态失败: " + e.getMessage());
-        }
 
         // 选项（槽位 9-17，最多9个）
         List<PollOption> opts = poll.getOptions();
@@ -118,14 +173,12 @@ public class DetailGui implements Listener {
         lore.add(color("&8票数: &f" + count + " &7(" + String.format("%.1f", pct) + "%)"));
         lore.add(buildBar(pct));
 
-        if (active) {
-            if (playerVoted) {
-                lore.add(" ");
-                lore.add(color("&a✔ 你已投此选项"));
-            } else {
-                lore.add(" ");
-                lore.add(color("&e▶ 点击投票"));
-            }
+        if (playerVoted) {
+            lore.add(" ");
+            lore.add(color(active ? "&a✔ 你已投此选项" : "&a✔ 你投给了此选项"));
+        } else if (active) {
+            lore.add(" ");
+            lore.add(color("&e▶ 点击投票"));
         }
 
         Material mat;
@@ -162,41 +215,86 @@ public class DetailGui implements Listener {
         if (slot < 0 || slot >= 36) return;
 
         if (slot == BACK_SLOT) {
+            if (votePending) {
+                send("&e正在记录投票，请稍候...");
+                return;
+            }
             goBack(); return;
         }
 
         if (slot == MANAGE_SLOT && player.hasPermission(plugin.getAdminPermission())) {
-            HandlerList.unregisterAll(this);
+            unregister();
             player.closeInventory();
-            plugin.getServer().getGlobalRegionScheduler().run(plugin,
-                    t -> new ManageGui(plugin, player, poll).open());
+            plugin.getPlatformAdapter().runForPlayer(player,
+                    () -> new ManageGui(plugin, player, poll).open());
             return;
         }
 
         // 选项槽位 9-17
-        if (slot >= 9 && slot <= 17 && poll.isActive()) {
+        if (dataLoaded && slot >= 9 && slot <= 17 && poll.isActive()) {
             if (!player.hasPermission("polls.vote")) {
-                player.sendMessage(color("&c你没有投票权限。"));
+                send("&c你没有投票权限。");
                 return;
             }
+            if (votePending) return;
             int idx = slot - 9;
             List<PollOption> opts = poll.getOptions();
             if (idx >= opts.size()) return;
 
-            try {
-                PollOption chosen = opts.get(idx);
-                boolean voted = plugin.getDatabase().castVote(poll.getId(), player.getUniqueId(), chosen.getId());
+            PollOption chosen = opts.get(idx);
+            int pollId = poll.getId();
+            var playerId = player.getUniqueId();
+            votePending = true;
+            plugin.getPlatformAdapter().runAsync(() -> castVote(pollId, playerId, chosen));
+        }
+    }
+
+    private void castVote(int pollId, java.util.UUID playerId, PollOption chosen) {
+        try {
+            boolean voted = plugin.getDatabase().castVote(pollId, playerId, chosen.getId());
+            int storedOptionId = voted
+                    ? chosen.getId()
+                    : plugin.getDatabase().getPlayerVote(pollId, playerId);
+            boolean alreadyVoted = !voted && storedOptionId != -1;
+            Poll fresh = plugin.getDatabase().loadPoll(pollId);
+            if (fresh != null) {
+                plugin.getPollCache().updateVoteSnapshot(fresh);
+            }
+            plugin.getPlatformAdapter().runForPlayer(player, () -> {
+                votePending = false;
+                if (fresh != null) {
+                    Poll latest = plugin.getPollCache().getById(pollId);
+                    poll = latest != null ? latest : fresh;
+                }
+                if (storedOptionId != -1) {
+                    votedOptionId = storedOptionId;
+                }
                 if (!voted) {
-                    player.sendMessage(color("&c你已经投过票了，不可更改。"));
+                    if (alreadyVoted) {
+                        send("&c你已经投过票了，不可更改。");
+                    } else if (fresh != null && !fresh.isActive()) {
+                        send("&c该议题已经结束。");
+                    } else {
+                        send("&c该选项已失效，请重新打开界面。");
+                    }
+                    if (fresh != null && isViewing()) populate();
                     return;
                 }
-                player.sendMessage(color("&a已投票：&f" + chosen.getLabel()));
-                poll = plugin.getDatabase().loadPoll(poll.getId());
-                populate();
-            } catch (Exception e) {
-                player.sendMessage(color("&c投票失败，请稍后再试。"));
-                plugin.getLogger().severe("投票失败: " + e.getMessage());
-            }
+                if (fresh == null) {
+                    send("&c投票结果刷新失败，请重新打开界面。");
+                    return;
+                }
+                send("&a已投票：&f" + chosen.getLabel());
+                if (isViewing()) {
+                    populate();
+                }
+            });
+        } catch (Exception e) {
+            plugin.getLogger().severe("投票失败: " + e.getMessage());
+            plugin.getPlatformAdapter().runForPlayer(player, () -> {
+                votePending = false;
+                send("&c投票失败，请稍后再试。");
+            });
         }
     }
 
@@ -204,21 +302,37 @@ public class DetailGui implements Listener {
     public void onClose(InventoryCloseEvent event) {
         if (event.getPlayer().getUniqueId().equals(player.getUniqueId())
                 && event.getInventory().equals(inv)) {
-            HandlerList.unregisterAll(this);
+            unregister();
         }
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         if (event.getPlayer().getUniqueId().equals(player.getUniqueId())) {
-            HandlerList.unregisterAll(this);
+            unregister();
         }
     }
 
     private void goBack() {
-        HandlerList.unregisterAll(this);
+        unregister();
         player.closeInventory();
-        plugin.getServer().getGlobalRegionScheduler().run(plugin,
-                t -> new MainGui(plugin, player).open());
+        plugin.getPlatformAdapter().runForPlayer(player,
+                () -> new MainGui(plugin, player).open());
+    }
+
+    private void send(String message) {
+        plugin.getPlatformAdapter().sendMessage(player, message);
+    }
+
+    private boolean isViewing() {
+        return open && player.isOnline()
+                && player.getOpenInventory().getTopInventory().equals(inv);
+    }
+
+    private void unregister() {
+        open = false;
+        removeCacheListener.run();
+        removeCacheListener = () -> {};
+        HandlerList.unregisterAll(this);
     }
 }

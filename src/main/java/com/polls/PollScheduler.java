@@ -1,15 +1,13 @@
 package com.polls;
 
-import com.polls.db.Database;
-import com.polls.db.PollCache;
 import com.polls.model.Poll;
-import com.polls.model.PollOption;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.sql.SQLException;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -17,34 +15,67 @@ import java.util.stream.Collectors;
 public class PollScheduler {
 
     private final PollsPlugin plugin;
-    private final Set<Integer> notifiedPollIds = new HashSet<>();
+    private final Map<Integer, Long> notifiedEndTimes = new HashMap<>();
 
     public PollScheduler(PollsPlugin plugin) {
         this.plugin = plugin;
     }
 
     public void start() {
-        plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(plugin, t -> {
+        rememberPreviouslyEndedPolls();
+        plugin.getPlatformAdapter().runRepeating(() -> {
             checkEnded();
             cleanExpired();
         }, 20L * 60, 20L * 60);
     }
 
+    private void rememberPreviouslyEndedPolls() {
+        for (Poll poll : plugin.getPollCache().getAll()) {
+            if (!poll.isActive()) {
+                notifiedEndTimes.put(poll.getId(), poll.getEndsAt());
+            }
+        }
+    }
+
     private void checkEnded() {
         List<Poll> polls = plugin.getPollCache().getAll();
         for (Poll poll : polls) {
-            if (!poll.isActive() && !notifiedPollIds.contains(poll.getId())) {
-                notifiedPollIds.add(poll.getId());
-                // 从 DB 加载最新数据，确保票数准确
-                try {
-                    Poll fresh = plugin.getDatabase().loadPoll(poll.getId());
-                    if (fresh != null) notifyAdmins(fresh);
-                } catch (SQLException e) {
-                    plugin.getLogger().warning("加载议题数据失败: " + e.getMessage());
-                    notifyAdmins(poll); // 降级：用缓存数据
+            if (poll.isActive()) {
+                notifiedEndTimes.remove(poll.getId());
+                continue;
+            }
+
+            Long notifiedEndTime = notifiedEndTimes.get(poll.getId());
+            if (notifiedEndTime != null && notifiedEndTime.longValue() == poll.getEndsAt()) {
+                continue;
+            }
+
+            try {
+                Poll fresh = plugin.getDatabase().loadPoll(poll.getId());
+                if (fresh == null) {
+                    notifiedEndTimes.remove(poll.getId());
+                    continue;
                 }
+                if (fresh.isActive()) {
+                    notifiedEndTimes.remove(poll.getId());
+                    continue;
+                }
+                Long freshNotifiedEndTime = notifiedEndTimes.get(fresh.getId());
+                if (freshNotifiedEndTime != null
+                        && freshNotifiedEndTime.longValue() == fresh.getEndsAt()) {
+                    continue;
+                }
+                notifiedEndTimes.put(fresh.getId(), fresh.getEndsAt());
+                notifyAdmins(fresh);
+            } catch (SQLException e) {
+                plugin.getLogger().warning("加载议题数据失败: " + e.getMessage());
+                notifiedEndTimes.put(poll.getId(), poll.getEndsAt());
+                notifyAdmins(poll);
             }
         }
+
+        Set<Integer> currentIds = polls.stream().map(Poll::getId).collect(Collectors.toSet());
+        notifiedEndTimes.keySet().retainAll(currentIds);
     }
 
     private void notifyAdmins(Poll poll) {
@@ -59,24 +90,26 @@ public class PollScheduler {
         });
         String msg = sb.toString();
         for (Player p : Bukkit.getOnlinePlayers()) {
-            if (p.hasPermission(plugin.getAdminPermission())) {
-                plugin.getPlatformAdapter().sendMessage(p, msg);
-            }
+            plugin.getPlatformAdapter().runForPlayer(p, () -> {
+                if (p.isOnline() && p.hasPermission(plugin.getAdminPermission())) {
+                    plugin.getPlatformAdapter().sendMessage(p, msg);
+                }
+            });
         }
     }
 
     private void cleanExpired() {
-        int retentionDays = plugin.getConfig().getInt("data-retention-days", 30);
+        int retentionDays = Math.max(1, plugin.getConfig().getInt("data-retention-days", 30));
         long cutoff = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(retentionDays);
         try {
             int deleted = plugin.getDatabase().deleteExpiredPolls(cutoff);
             if (deleted > 0) {
                 plugin.getPollCache().reload();
-                // 清除已删除 poll 的已通知记录，避免内存泄漏
+                // 清除已删除 poll 的通知记录，避免内存泄漏
                 Set<Integer> activeIds = plugin.getPollCache().getAll()
                         .stream().map(Poll::getId)
                         .collect(Collectors.toSet());
-                notifiedPollIds.retainAll(activeIds);
+                notifiedEndTimes.keySet().retainAll(activeIds);
                 plugin.getLogger().info("清理过期议题 " + deleted + " 条");
             }
         } catch (SQLException e) {

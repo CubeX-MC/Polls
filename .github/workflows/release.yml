@@ -42,8 +42,8 @@ jobs:
             将 `Polls-*.jar` 放入服务器 `plugins/` 目录后重启。
 
             ### 要求
-            - Folia 1.21.4+
-            - Java 17+
+            - Bukkit / Spigot / Paper / Folia 1.21.4+
+            - Java 21+
           files: target/Polls-*.jar
           draft: false
           prerelease: false

@@ -3,9 +3,6 @@ package com.polls.gui;
 import com.polls.PollsPlugin;
 import com.polls.model.Poll;
 import com.polls.util.DurationParser;
-import io.papermc.paper.event.player.AsyncChatEvent;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -37,8 +34,12 @@ public class SubmitFlow implements Listener {
 
     private final PollsPlugin plugin;
     private final Player player;
+    private final Listener chatInputListener;
+    private final Runnable sessionCancellation;
 
-    private int step = 0;
+    private static final int STEP_PROCESSING = -1;
+
+    private volatile int step;
     private String title;
     private String description;
     private long endsAt;
@@ -54,7 +55,12 @@ public class SubmitFlow implements Listener {
     public SubmitFlow(PollsPlugin plugin, Player player) {
         this.plugin = plugin;
         this.player = player;
+        this.sessionCancellation = this::cancelReplacedSession;
+        this.chatInputListener = plugin.getPlatformAdapter()
+                .createChatInputListener(player, this::consumeChatInput);
         Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(chatInputListener, plugin);
+        plugin.registerInputSession(player.getUniqueId(), sessionCancellation);
         startStep0();
     }
 
@@ -69,7 +75,7 @@ public class SubmitFlow implements Listener {
 
     private void startStep1() {
         step = 1;
-        send("&e请输入议题&6描述&e（可为空，直接回车跳过）");
+        send("&e请输入议题&6描述&e，输入 &fskip &e跳过");
     }
 
     private void startStep2() {
@@ -80,8 +86,7 @@ public class SubmitFlow implements Listener {
     private void openOptionManager() {
         step = 3;
         int rows = 4;
-        optionInv = Bukkit.createInventory(null, rows * 9,
-                LegacyComponentSerializer.legacyAmpersand().deserialize("&8[ &6添加选项 &8]"));
+        optionInv = Bukkit.createInventory(null, rows * 9, color("&8[ &6添加选项 &8]"));
         refreshOptionManager();
         player.openInventory(optionInv);
     }
@@ -101,7 +106,7 @@ public class SubmitFlow implements Listener {
         }
 
         // 添加按钮
-        int maxOptions = plugin.getConfig().getInt("max-options", 9);
+        int maxOptions = Math.clamp(plugin.getConfig().getInt("max-options", 9), 2, 9);
         if (options.size() < maxOptions) {
             optionInv.setItem(27, makeItem(Material.LIME_DYE, "&a+ 添加选项",
                     List.of(color("&7点击添加新选项"))));
@@ -126,60 +131,99 @@ public class SubmitFlow implements Listener {
 
     private void startOptionDescInput() {
         step = 5;
-        send("&e请输入&6选项描述&e（可留空，直接回车跳过）");
+        send("&e请输入&6选项描述&e，输入 &fskip &e跳过");
     }
 
     // ─── 事件处理 ───
 
-    @EventHandler
-    public void onChat(AsyncChatEvent event) {
-        if (!event.getPlayer().getUniqueId().equals(player.getUniqueId())) return;
-        // step 3 是 GUI 阶段，不需要处理聊天输入
-        if (step == 3) return;
-        event.setCancelled(true);
-        String msg = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
+    private boolean consumeChatInput(String message) {
+        int inputStep;
+        synchronized (this) {
+            // step 3 是 GUI 阶段，不需要处理聊天输入
+            if (step == 3) return false;
+            // 首条输入正在回到玩家线程处理时，后续消息也不能泄露到公屏。
+            if (step == STEP_PROCESSING) return true;
+            inputStep = step;
+            step = STEP_PROCESSING;
+        }
 
-        if (msg.equalsIgnoreCase("cancel")) { abort(); return; }
+        plugin.getPlatformAdapter().runForPlayer(player, () -> {
+            if (plugin.isInputSessionActive(player.getUniqueId(), sessionCancellation)) {
+                handleChatInput(inputStep, message);
+            }
+        });
+        return true;
+    }
 
-        switch (step) {
+    private void handleChatInput(int inputStep, String msg) {
+        if (msg.equalsIgnoreCase("cancel")) {
+            abort(true);
+            return;
+        }
+
+        switch (inputStep) {
             case 0 -> {
                 int max = plugin.getConfig().getInt("max-title-length", 40);
-                if (msg.isEmpty()) { send("&c标题不能为空"); return; }
-                if (msg.length() > max) { send("&c标题过长（最多 " + max + " 字）"); return; }
+                if (msg.isEmpty()) { retry(inputStep, "&c标题不能为空"); return; }
+                if (msg.length() > max) {
+                    retry(inputStep, "&c标题过长（最多 " + max + " 字）");
+                    return;
+                }
                 title = msg;
-                plugin.getServer().getGlobalRegionScheduler().run(plugin, t -> startStep1());
+                startStep1();
             }
             case 1 -> {
+                String newDescription = msg.equalsIgnoreCase("skip") ? "" : msg;
                 int max = plugin.getConfig().getInt("max-description-length", 200);
-                if (msg.length() > max) { send("&c描述过长（最多 " + max + " 字）"); return; }
-                description = msg;
-                plugin.getServer().getGlobalRegionScheduler().run(plugin, t -> startStep2());
+                if (newDescription.length() > max) {
+                    retry(inputStep, "&c描述过长（最多 " + max + " 字）");
+                    return;
+                }
+                description = newDescription;
+                startStep2();
             }
             case 2 -> {
                 long millis = DurationParser.parseMillis(msg);
-                if (millis <= 0) { send("&c格式有误，示例：30m / 12h / 3d"); return; }
-                endsAt = System.currentTimeMillis() + millis;
-                plugin.getServer().getGlobalRegionScheduler().run(plugin, t -> openOptionManager());
+                long now = System.currentTimeMillis();
+                if (millis <= 0 || millis > Long.MAX_VALUE - now) {
+                    retry(inputStep, "&c格式或时长有误，示例：30m / 12h / 3d");
+                    return;
+                }
+                endsAt = now + millis;
+                openOptionManager();
             }
             case 4 -> {
                 if (msg.equalsIgnoreCase("back")) {
-                    plugin.getServer().getGlobalRegionScheduler().run(plugin, t -> openOptionManager());
+                    openOptionManager();
                     return;
                 }
                 int max = plugin.getConfig().getInt("max-option-label-length", 40);
-                if (msg.isEmpty()) { send("&c选项名称不能为空"); return; }
-                if (msg.length() > max) { send("&c选项名称过长"); return; }
+                if (msg.isEmpty()) { retry(inputStep, "&c选项名称不能为空"); return; }
+                if (msg.length() > max) {
+                    retry(inputStep, "&c选项名称过长（最多 " + max + " 字）");
+                    return;
+                }
                 pendingOptionLabel = msg;
-                plugin.getServer().getGlobalRegionScheduler().run(plugin, t -> startOptionDescInput());
+                startOptionDescInput();
             }
             case 5 -> {
+                String optionDescription = msg.equalsIgnoreCase("skip") ? "" : msg;
                 int max = plugin.getConfig().getInt("max-option-desc-length", 100);
-                if (msg.length() > max) { send("&c描述过长（最多 " + max + " 字）"); return; }
-                options.add(new String[]{pendingOptionLabel, msg});
+                if (optionDescription.length() > max) {
+                    retry(inputStep, "&c描述过长（最多 " + max + " 字）");
+                    return;
+                }
+                options.add(new String[]{pendingOptionLabel, optionDescription});
                 pendingOptionLabel = null;
-                plugin.getServer().getGlobalRegionScheduler().run(plugin, t -> openOptionManager());
+                openOptionManager();
             }
+            default -> step = inputStep;
         }
+    }
+
+    private void retry(int inputStep, String message) {
+        step = inputStep;
+        send(message);
     }
 
     @EventHandler
@@ -194,7 +238,10 @@ public class SubmitFlow implements Listener {
 
         if (slot == 27) {
             // 添加选项
-            startOptionLabelInput();
+            int maxOptions = Math.clamp(plugin.getConfig().getInt("max-options", 9), 2, 9);
+            if (options.size() < maxOptions) {
+                startOptionLabelInput();
+            }
         } else if (slot == 35 && options.size() >= 2) {
             // 完成提交
             finish();
@@ -211,51 +258,67 @@ public class SubmitFlow implements Listener {
         if (optionInv == null || !event.getInventory().equals(optionInv)) return;
         // 只有在 step==3 时关闭才视为放弃（step 4/5 是手动关的）
         if (step == 3) {
-            abort();
+            abort(false);
         }
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         if (event.getPlayer().getUniqueId().equals(player.getUniqueId())) {
-            HandlerList.unregisterAll(this);
+            unregisterListeners();
         }
     }
 
     // ─── 提交 ───
 
     private void finish() {
-        HandlerList.unregisterAll(this);
+        step = STEP_PROCESSING;
+        unregisterListeners();
         player.closeInventory();
-        plugin.getServer().getGlobalRegionScheduler().run(plugin, t -> {
+
+        List<String[]> optionSnapshot = options.stream()
+                .map(option -> new String[]{option[0], option[1]})
+                .toList();
+        var creator = player.getUniqueId();
+        String creatorName = player.getName();
+        long createdAt = System.currentTimeMillis();
+        plugin.getPlatformAdapter().runAsync(() -> {
             try {
-                int pollId = plugin.getDatabase().insertPoll(
-                        player.getUniqueId(), player.getName(),
-                        title, description,
-                        System.currentTimeMillis(), endsAt);
-                for (int i = 0; i < options.size(); i++) {
-                    plugin.getDatabase().insertOption(pollId, i, options.get(i)[0], options.get(i)[1]);
-                }
-                // 增量更新缓存，避免全量重载
+                int pollId = plugin.getDatabase().insertPollWithOptions(
+                        creator, creatorName, title, description, createdAt, endsAt, optionSnapshot);
                 Poll newPoll = plugin.getDatabase().loadPoll(pollId);
                 if (newPoll != null) plugin.getPollCache().addPoll(newPoll);
-                send("&a议题提交成功！使用 &e/polls &a查看。");
+                plugin.getPlatformAdapter().runForPlayer(player,
+                        () -> send("&a议题提交成功！使用 &e/polls &a查看。"));
             } catch (Exception e) {
-                send("&c提交失败，请联系管理员。");
                 plugin.getLogger().severe("提交议题失败: " + e.getMessage());
+                plugin.getPlatformAdapter().runForPlayer(player,
+                        () -> send("&c提交失败，请联系管理员。"));
             }
         });
     }
 
-    private void abort() {
-        HandlerList.unregisterAll(this);
-        player.closeInventory();
+    private void abort(boolean closeInventory) {
+        step = STEP_PROCESSING;
+        unregisterListeners();
+        if (closeInventory) player.closeInventory();
         send("&c已取消提交。");
+    }
+
+    private void cancelReplacedSession() {
+        step = STEP_PROCESSING;
+        unregisterListeners();
+    }
+
+    private void unregisterListeners() {
+        HandlerList.unregisterAll(this);
+        HandlerList.unregisterAll(chatInputListener);
+        plugin.clearInputSession(player.getUniqueId(), sessionCancellation);
     }
 
     // ─── 工具 ───
 
     private void send(String msg) {
-        player.sendMessage(color(msg));
+        plugin.getPlatformAdapter().sendMessage(player, msg);
     }
 }

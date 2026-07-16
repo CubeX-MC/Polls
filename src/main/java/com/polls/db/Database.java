@@ -21,11 +21,21 @@ public class Database {
         this.plugin = plugin;
     }
 
-    public void init() throws SQLException {
+    public synchronized void init() throws SQLException {
         File dbFile = new File(plugin.getDataFolder(), "polls.db");
         String url = "jdbc:sqlite:" + dbFile.getAbsolutePath();
         connection = DriverManager.getConnection(url);
+        configureConnection();
         createTables();
+        cleanOrphanedRows();
+    }
+
+    private void configureConnection() throws SQLException {
+        try (Statement st = connection.createStatement()) {
+            st.execute("PRAGMA foreign_keys = ON");
+            st.execute("PRAGMA busy_timeout = 5000");
+            st.execute("PRAGMA journal_mode = WAL");
+        }
     }
 
     private void createTables() throws SQLException {
@@ -79,10 +89,37 @@ public class Database {
         }
     }
 
+    private void cleanOrphanedRows() throws SQLException {
+        int deleted;
+        try (Statement st = connection.createStatement()) {
+            deleted = st.executeUpdate("""
+                    DELETE FROM poll_votes
+                    WHERE NOT EXISTS (SELECT 1 FROM polls WHERE polls.id = poll_votes.poll_id)
+                       OR NOT EXISTS (SELECT 1 FROM poll_options WHERE poll_options.id = poll_votes.option_id)
+                    """);
+            deleted += st.executeUpdate("""
+                    DELETE FROM favorites
+                    WHERE NOT EXISTS (SELECT 1 FROM polls WHERE polls.id = favorites.poll_id)
+                    """);
+            deleted += st.executeUpdate("""
+                    DELETE FROM poll_options
+                    WHERE NOT EXISTS (SELECT 1 FROM polls WHERE polls.id = poll_options.poll_id)
+                    """);
+        }
+        if (deleted > 0) {
+            plugin.getLogger().info("清理历史孤儿数据 " + deleted + " 条");
+        }
+    }
+
     // ─── 写入议题 ───
 
-    public int insertPoll(UUID creator, String creatorName, String title,
-                          String description, long createdAt, long endsAt) throws SQLException {
+    public synchronized int insertPoll(UUID creator, String creatorName, String title,
+                                       String description, long createdAt, long endsAt) throws SQLException {
+        return insertPollInternal(creator, creatorName, title, description, createdAt, endsAt);
+    }
+
+    private int insertPollInternal(UUID creator, String creatorName, String title,
+                                   String description, long createdAt, long endsAt) throws SQLException {
         String sql = "INSERT INTO polls (creator, creator_name, title, description, created_at, ends_at) VALUES (?,?,?,?,?,?)";
         try (PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, creator.toString());
@@ -98,7 +135,11 @@ public class Database {
         }
     }
 
-    public void insertOption(int pollId, int slot, String label, String description) throws SQLException {
+    public synchronized void insertOption(int pollId, int slot, String label, String description) throws SQLException {
+        insertOptionInternal(pollId, slot, label, description);
+    }
+
+    private void insertOptionInternal(int pollId, int slot, String label, String description) throws SQLException {
         String sql = "INSERT INTO poll_options (poll_id, slot, label, description) VALUES (?,?,?,?)";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, pollId);
@@ -109,9 +150,45 @@ public class Database {
         }
     }
 
+    /**
+     * 在同一事务中创建议题及其全部选项，任一写入失败时不会留下不完整议题。
+     * 每个选项数组依次为名称和描述。
+     */
+    public synchronized int insertPollWithOptions(UUID creator, String creatorName, String title,
+                                                   String description, long createdAt, long endsAt,
+                                                   List<String[]> options) throws SQLException {
+        if (options == null || options.size() < 2 || options.size() > 9) {
+            throw new IllegalArgumentException("options must contain between 2 and 9 entries");
+        }
+        for (String[] option : options) {
+            if (option == null || option.length < 2) {
+                throw new IllegalArgumentException("each option must contain a label and description");
+            }
+        }
+
+        connection.setAutoCommit(false);
+        try {
+            int pollId = insertPollInternal(creator, creatorName, title, description, createdAt, endsAt);
+            if (pollId < 0) {
+                throw new SQLException("创建议题后未返回 ID");
+            }
+            for (int i = 0; i < options.size(); i++) {
+                String[] option = options.get(i);
+                insertOptionInternal(pollId, i, option[0], option[1]);
+            }
+            connection.commit();
+            return pollId;
+        } catch (SQLException | RuntimeException e) {
+            rollback(e);
+            throw e;
+        } finally {
+            connection.setAutoCommit(true);
+        }
+    }
+
     // ─── 读取议题 ───
 
-    public List<Poll> loadAllPolls() throws SQLException {
+    public synchronized List<Poll> loadAllPolls() throws SQLException {
         List<Poll> polls = new ArrayList<>();
         String sql = "SELECT * FROM polls ORDER BY ends_at DESC";
         try (Statement st = connection.createStatement();
@@ -150,7 +227,7 @@ public class Database {
         }
     }
 
-    public Poll loadPoll(int id) throws SQLException {
+    public synchronized Poll loadPoll(int id) throws SQLException {
         String sql = "SELECT * FROM polls WHERE id = ?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, id);
@@ -196,7 +273,7 @@ public class Database {
 
     // ─── 投票 ───
 
-    public boolean hasVoted(int pollId, UUID player) throws SQLException {
+    public synchronized boolean hasVoted(int pollId, UUID player) throws SQLException {
         String sql = "SELECT 1 FROM poll_votes WHERE poll_id = ? AND player_uuid = ?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, pollId);
@@ -207,7 +284,7 @@ public class Database {
         }
     }
 
-    public int getPlayerVote(int pollId, UUID player) throws SQLException {
+    public synchronized int getPlayerVote(int pollId, UUID player) throws SQLException {
         String sql = "SELECT option_id FROM poll_votes WHERE poll_id = ? AND player_uuid = ?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, pollId);
@@ -222,16 +299,35 @@ public class Database {
      * 原子投票：INSERT OR IGNORE 避免 check-then-act 竞态。
      * 若行已存在（重复投票）返回 false，成功返回 true。
      */
-    public boolean castVote(int pollId, UUID player, int optionId) throws SQLException {
+    public synchronized boolean castVote(int pollId, UUID player, int optionId) throws SQLException {
         connection.setAutoCommit(false);
         try {
+            long votedAt = System.currentTimeMillis();
+            String validate = """
+                    SELECT 1
+                    FROM polls p
+                    JOIN poll_options o ON o.poll_id = p.id
+                    WHERE p.id = ? AND p.ends_at > ? AND o.id = ?
+            """;
+            try (PreparedStatement ps = connection.prepareStatement(validate)) {
+                ps.setInt(1, pollId);
+                ps.setLong(2, votedAt);
+                ps.setInt(3, optionId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        connection.rollback();
+                        return false;
+                    }
+                }
+            }
+
             String insert = "INSERT OR IGNORE INTO poll_votes (poll_id, player_uuid, option_id, voted_at) VALUES (?,?,?,?)";
             int inserted;
             try (PreparedStatement ps = connection.prepareStatement(insert)) {
                 ps.setInt(1, pollId);
                 ps.setString(2, player.toString());
                 ps.setInt(3, optionId);
-                ps.setLong(4, System.currentTimeMillis());
+                ps.setLong(4, votedAt);
                 inserted = ps.executeUpdate();
             }
             if (inserted == 0) {
@@ -239,24 +335,35 @@ public class Database {
                 connection.rollback();
                 return false;
             }
-            String update = "UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = ?";
+            String update = "UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = ? AND poll_id = ?";
             try (PreparedStatement ps = connection.prepareStatement(update)) {
                 ps.setInt(1, optionId);
-                ps.executeUpdate();
+                ps.setInt(2, pollId);
+                if (ps.executeUpdate() != 1) {
+                    throw new SQLException("投票选项不存在或不属于该议题");
+                }
             }
             connection.commit();
             return true;
-        } catch (SQLException e) {
-            connection.rollback();
+        } catch (SQLException | RuntimeException e) {
+            rollback(e);
             throw e;
         } finally {
             connection.setAutoCommit(true);
         }
     }
 
+    private void rollback(Throwable cause) {
+        try {
+            connection.rollback();
+        } catch (SQLException rollbackError) {
+            cause.addSuppressed(rollbackError);
+        }
+    }
+
     // ─── 议题管理 ───
 
-    public void updatePollTitleDesc(int pollId, String title, String description) throws SQLException {
+    public synchronized void updatePollTitleDesc(int pollId, String title, String description) throws SQLException {
         String sql = "UPDATE polls SET title = ?, description = ? WHERE id = ?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, title);
@@ -266,7 +373,7 @@ public class Database {
         }
     }
 
-    public void updatePollEndsAt(int pollId, long endsAt) throws SQLException {
+    public synchronized void updatePollEndsAt(int pollId, long endsAt) throws SQLException {
         String sql = "UPDATE polls SET ends_at = ? WHERE id = ?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setLong(1, endsAt);
@@ -275,7 +382,7 @@ public class Database {
         }
     }
 
-    public void deletePoll(int pollId) throws SQLException {
+    public synchronized void deletePoll(int pollId) throws SQLException {
         String sql = "DELETE FROM polls WHERE id = ?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, pollId);
@@ -285,7 +392,7 @@ public class Database {
 
     // ─── 过期清理 ───
 
-    public int deleteExpiredPolls(long cutoffTime) throws SQLException {
+    public synchronized int deleteExpiredPolls(long cutoffTime) throws SQLException {
         String sql = "DELETE FROM polls WHERE ends_at < ?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setLong(1, cutoffTime);
@@ -293,7 +400,7 @@ public class Database {
         }
     }
 
-    public void close() {
+    public synchronized void close() {
         try {
             if (connection != null && !connection.isClosed()) connection.close();
         } catch (SQLException e) {

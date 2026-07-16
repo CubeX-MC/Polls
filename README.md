@@ -39,7 +39,7 @@
 
 ### 参与投票
 1. 输入 `/polls` 打开主界面
-2. 主界面分两区：**进行中** 和 **已结束**
+2. 主界面分两区：**进行中** 和 **已结束**，议题较多时可分别翻页
 3. 点击任意议题进入详情页
 4. 进行中的议题可点击选项进行投票，已结束的仅展示结果
 
@@ -53,10 +53,10 @@
 1. 主界面右下角点击"提交新议题"
 2. 在聊天框依次输入：
    - 议题标题
-   - 议题描述（可留空）
+   - 议题描述（输入 `skip` 跳过）
    - 截止时长，格式：`30m` / `12h` / `3d` / `7d`
 3. 弹出选项管理界面，逐个添加选项
-   - 每个选项需填写名称和描述（描述可留空）
+   - 每个选项需填写名称和描述（输入 `skip` 跳过描述）
    - 至少添加 2 个选项，最多 9 个
 4. 点击"完成提交"
 
@@ -80,17 +80,20 @@
 `config.yml`：
 
 ```yaml
-# 投票数据保留天数
+# 投票数据保留天数（最小为 1）
 data-retention-days: 30
 
 # 管理员权限节点
 admin-permission: polls.admin
 
-# 每个议题最多可添加的选项数
+# 每个议题最多可添加的选项数（有效范围 2-9）
 max-options: 9
 
 # 议题标题最大字符数
 max-title-length: 40
+
+# 选项名称最大字符数
+max-option-label-length: 40
 
 # 议题描述最大字符数
 max-description-length: 200
@@ -123,9 +126,10 @@ max-option-desc-length: 100
 
 ## 安装
 
-1. 将 `Polls-*.jar` 放入服务器 `plugins/` 目录
-2. 重启服务器
-3. 按需修改 `plugins/Polls/config.yml`
+1. 确保服务端使用 Java 21 或更高版本
+2. 将 `Polls-*.jar` 放入服务器 `plugins/` 目录
+3. 重启服务器
+4. 按需修改 `plugins/Polls/config.yml`
 
 ---
 
@@ -138,4 +142,4 @@ max-option-desc-length: 100
 | Paper 1.21+ | ✅（自动启用 Adventure API 和性能优化） |
 | Folia 1.21+ | ✅（区域线程支持） |
 
-插件在运行时自动检测服务端类型，Paper 环境下启用 Adventure API 和异步调度器优化，其他环境使用 Bukkit 兼容模式。
+插件在运行时自动检测服务端类型，Paper/Folia 环境下启用 Adventure API 和区域调度支持，其他环境使用 Bukkit 兼容模式。

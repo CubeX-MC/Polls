@@ -4,7 +4,6 @@ import com.polls.db.Database;
 import com.polls.db.PollCache;
 import com.polls.gui.MainGui;
 import com.polls.platform.PlatformAdapter;
-import com.polls.platform.PaperAdapter;
 import com.polls.platform.BukkitAdapter;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.command.Command;
@@ -13,27 +12,24 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class PollsPlugin extends JavaPlugin implements CommandExecutor {
 
     private Database database;
     private PollCache pollCache;
     private PollScheduler scheduler;
     private PlatformAdapter platformAdapter;
+    private final ConcurrentHashMap<UUID, Runnable> inputSessions = new ConcurrentHashMap<>();
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         getDataFolder().mkdirs();
 
-        // 检测并初始化平台适配器
-        try {
-            Class.forName("io.papermc.paper.threadedregions.scheduler.AsyncScheduler");
-            platformAdapter = new PaperAdapter(this);
-            getLogger().info("检测到 Paper 服务器，启用 Adventure API 支持");
-        } catch (ClassNotFoundException e) {
-            platformAdapter = new BukkitAdapter(this);
-            getLogger().info("使用 Bukkit/Spigot/Folia 兼容模式");
-        }
+        platformAdapter = createPlatformAdapter();
+        getLogger().info("当前平台: " + platformAdapter.getPlatformName());
 
         database = new Database(this);
         try {
@@ -59,6 +55,7 @@ public class PollsPlugin extends JavaPlugin implements CommandExecutor {
 
     @Override
     public void onDisable() {
+        inputSessions.clear();
         if (database != null) database.close();
         getLogger().info("Polls 已停止。");
     }
@@ -69,7 +66,8 @@ public class PollsPlugin extends JavaPlugin implements CommandExecutor {
             sender.sendMessage("§c只有玩家才能使用此命令。");
             return true;
         }
-        getServer().getGlobalRegionScheduler().run(this, t -> new MainGui(this, player).open());
+        cancelInputSession(player.getUniqueId());
+        platformAdapter.runForPlayer(player, () -> new MainGui(this, player).open());
         return true;
     }
 
@@ -79,4 +77,41 @@ public class PollsPlugin extends JavaPlugin implements CommandExecutor {
         return getConfig().getString("admin-permission", "polls.admin");
     }
     public PlatformAdapter getPlatformAdapter() { return platformAdapter; }
+
+    public void registerInputSession(UUID playerId, Runnable cancellation) {
+        Runnable previous = inputSessions.put(playerId, cancellation);
+        if (previous != null && previous != cancellation) {
+            previous.run();
+        }
+    }
+
+    public boolean isInputSessionActive(UUID playerId, Runnable cancellation) {
+        return inputSessions.get(playerId) == cancellation;
+    }
+
+    public void clearInputSession(UUID playerId, Runnable cancellation) {
+        inputSessions.remove(playerId, cancellation);
+    }
+
+    private void cancelInputSession(UUID playerId) {
+        Runnable cancellation = inputSessions.remove(playerId);
+        if (cancellation != null) {
+            cancellation.run();
+        }
+    }
+
+    private PlatformAdapter createPlatformAdapter() {
+        try {
+            Class.forName("io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler");
+            Class<?> adapterClass = Class.forName("com.polls.platform.PaperAdapter");
+            return (PlatformAdapter) adapterClass
+                    .getConstructor(JavaPlugin.class)
+                    .newInstance(this);
+        } catch (ClassNotFoundException e) {
+            return new BukkitAdapter(this);
+        } catch (ReflectiveOperationException | LinkageError e) {
+            getLogger().warning("Paper/Folia 适配器初始化失败，将使用 Bukkit 调度器: " + e.getMessage());
+            return new BukkitAdapter(this);
+        }
+    }
 }
