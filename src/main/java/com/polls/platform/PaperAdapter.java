@@ -2,7 +2,9 @@ package com.polls.platform;
 
 import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
 import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
+import io.papermc.paper.event.player.AbstractChatEvent;
 import io.papermc.paper.event.player.AsyncChatEvent;
+import io.papermc.paper.event.player.ChatEvent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -11,6 +13,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerChatEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.UUID;
@@ -72,6 +76,7 @@ public class PaperAdapter implements PlatformAdapter {
         return "Paper/Folia";
     }
 
+    @SuppressWarnings("deprecation")
     private static final class PaperChatInputListener implements Listener {
 
         private final UUID playerId;
@@ -83,13 +88,84 @@ public class PaperAdapter implements PlatformAdapter {
         }
 
         @EventHandler(priority = EventPriority.LOWEST)
-        public void onChat(AsyncChatEvent event) {
+        public void onAsyncChatInput(AsyncChatEvent event) {
+            handlePaperChat(event);
+        }
+
+        @EventHandler(priority = EventPriority.HIGHEST)
+        public void onAsyncChatFinal(AsyncChatEvent event) {
+            handlePaperChat(event);
+        }
+
+        @EventHandler(priority = EventPriority.LOWEST)
+        public void onChatInput(ChatEvent event) {
+            handlePaperChat(event);
+        }
+
+        @EventHandler(priority = EventPriority.HIGHEST)
+        public void onChatFinal(ChatEvent event) {
+            handlePaperChat(event);
+        }
+
+        @EventHandler(priority = EventPriority.LOWEST)
+        public void onLegacyAsyncChatInput(AsyncPlayerChatEvent event) {
+            handleLegacyChat(event);
+        }
+
+        @EventHandler(priority = EventPriority.HIGHEST)
+        public void onLegacyAsyncChatFinal(AsyncPlayerChatEvent event) {
+            handleLegacyChat(event);
+        }
+
+        @EventHandler(priority = EventPriority.LOWEST)
+        public void onLegacyChatInput(PlayerChatEvent event) {
+            handleLegacyChat(event);
+        }
+
+        @EventHandler(priority = EventPriority.HIGHEST)
+        public void onLegacyChatFinal(PlayerChatEvent event) {
+            handleLegacyChat(event);
+        }
+
+        private void handlePaperChat(AbstractChatEvent event) {
             if (!event.getPlayer().getUniqueId().equals(playerId)) return;
             String message = PlainTextComponentSerializer.plainText()
                     .serialize(event.message())
                     .trim();
             if (inputHandler.test(message)) {
                 event.setCancelled(true);
+                event.message(Component.empty());
+                try {
+                    event.viewers().clear();
+                } catch (UnsupportedOperationException ignored) {
+                    // Cancellation still prevents the standard Paper broadcast.
+                }
+            }
+        }
+
+        private void handleLegacyChat(AsyncPlayerChatEvent event) {
+            if (!event.getPlayer().getUniqueId().equals(playerId)) return;
+            if (inputHandler.test(event.getMessage().trim())) {
+                event.setCancelled(true);
+                event.setMessage("");
+                try {
+                    event.getRecipients().clear();
+                } catch (UnsupportedOperationException ignored) {
+                    // Cancellation still prevents the standard Bukkit broadcast.
+                }
+            }
+        }
+
+        private void handleLegacyChat(PlayerChatEvent event) {
+            if (!event.getPlayer().getUniqueId().equals(playerId)) return;
+            if (inputHandler.test(event.getMessage().trim())) {
+                event.setCancelled(true);
+                event.setMessage("");
+                try {
+                    event.getRecipients().clear();
+                } catch (UnsupportedOperationException ignored) {
+                    // Cancellation still prevents the standard Bukkit broadcast.
+                }
             }
         }
     }

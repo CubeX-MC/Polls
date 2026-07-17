@@ -31,6 +31,7 @@ public class ManageGui implements Listener {
     private final PollsPlugin plugin;
     private final Player player;
     private final Listener chatInputListener;
+    private final ChatInputCapture chatInputCapture;
     private final Runnable sessionCancellation;
     private Poll poll;
     private Inventory inv;
@@ -53,9 +54,11 @@ public class ManageGui implements Listener {
         this.sessionCancellation = this::cancelReplacedSession;
         this.chatInputListener = plugin.getPlatformAdapter()
                 .createChatInputListener(player, this::consumeChatInput);
+        this.chatInputCapture = new ChatInputCapture(plugin, player, this::consumeChatInput);
     }
 
     public void open() {
+        chatInputCapture.stop();
         inputProcessing = false;
         inv = Bukkit.createInventory(null, 36, color("&8[ &c管理议题 &8]"));
         populate();
@@ -130,6 +133,7 @@ public class ManageGui implements Listener {
             inputProcessing = false;
         }
         player.closeInventory();
+        chatInputCapture.start();
         send(prompt);
         send("&7输入 &ccancel &7取消");
     }
@@ -247,6 +251,7 @@ public class ManageGui implements Listener {
     }
 
     private void unregisterListener() {
+        chatInputCapture.stop();
         HandlerList.unregisterAll(this);
         HandlerList.unregisterAll(chatInputListener);
         plugin.clearInputSession(player.getUniqueId(), sessionCancellation);

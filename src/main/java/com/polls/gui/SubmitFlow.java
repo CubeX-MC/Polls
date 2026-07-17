@@ -35,6 +35,7 @@ public class SubmitFlow implements Listener {
     private final PollsPlugin plugin;
     private final Player player;
     private final Listener chatInputListener;
+    private final ChatInputCapture chatInputCapture;
     private final Runnable sessionCancellation;
 
     private static final int STEP_PROCESSING = -1;
@@ -58,6 +59,7 @@ public class SubmitFlow implements Listener {
         this.sessionCancellation = this::cancelReplacedSession;
         this.chatInputListener = plugin.getPlatformAdapter()
                 .createChatInputListener(player, this::consumeChatInput);
+        this.chatInputCapture = new ChatInputCapture(plugin, player, this::consumeChatInput);
         Bukkit.getPluginManager().registerEvents(this, plugin);
         Bukkit.getPluginManager().registerEvents(chatInputListener, plugin);
         plugin.registerInputSession(player.getUniqueId(), sessionCancellation);
@@ -69,22 +71,26 @@ public class SubmitFlow implements Listener {
     private void startStep0() {
         step = 0;
         player.closeInventory();
+        chatInputCapture.start();
         send("&e请在聊天框输入议题&6标题&e（最多 " + plugin.getConfig().getInt("max-title-length", 40) + " 字）");
         send("&7输入 &ccancel &7取消");
     }
 
     private void startStep1() {
         step = 1;
+        chatInputCapture.start();
         send("&e请输入议题&6描述&e，输入 &fskip &e跳过");
     }
 
     private void startStep2() {
         step = 2;
+        chatInputCapture.start();
         send("&e请输入&6截止时长&e，格式：&f30m &7/ &f12h &7/ &f3d &7（仅支持单个单位）");
     }
 
     private void openOptionManager() {
         step = 3;
+        chatInputCapture.stop();
         int rows = 4;
         optionInv = Bukkit.createInventory(null, rows * 9, color("&8[ &6添加选项 &8]"));
         refreshOptionManager();
@@ -125,12 +131,14 @@ public class SubmitFlow implements Listener {
     private void startOptionLabelInput() {
         step = 4;
         player.closeInventory();
+        chatInputCapture.start();
         send("&e请输入&6选项名称&e（简短标题）");
         send("&7输入 &cback &7返回");
     }
 
     private void startOptionDescInput() {
         step = 5;
+        chatInputCapture.start();
         send("&e请输入&6选项描述&e，输入 &fskip &e跳过");
     }
 
@@ -311,6 +319,7 @@ public class SubmitFlow implements Listener {
     }
 
     private void unregisterListeners() {
+        chatInputCapture.stop();
         HandlerList.unregisterAll(this);
         HandlerList.unregisterAll(chatInputListener);
         plugin.clearInputSession(player.getUniqueId(), sessionCancellation);

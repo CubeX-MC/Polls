@@ -38,6 +38,8 @@ jobs:
           body: |
             ## Polls ${{ steps.get_version.outputs.VERSION }}
 
+            ${{ contains(github.ref_name, '-beta') && '> Beta 测试版本，请先在测试服务器验证后再用于生产环境。' || '' }}
+
             ### 安装
             将 `Polls-*.jar` 放入服务器 `plugins/` 目录后重启。
 
@@ -46,6 +48,6 @@ jobs:
             - Java 21+
           files: target/Polls-*.jar
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-beta') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
