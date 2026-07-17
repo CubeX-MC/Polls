@@ -17,6 +17,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static com.polls.gui.GuiUtils.color;
 import static com.polls.gui.GuiUtils.makeItem;
@@ -40,6 +41,11 @@ public class ManageGui implements Listener {
     // 等待输入的状态
     private volatile String pendingAction; // "title", "desc", "time", "confirm_delete"
     private volatile boolean inputProcessing;
+
+    @FunctionalInterface
+    private interface DatabaseAction {
+        Poll run() throws Exception;
+    }
 
     private static final int SLOT_EDIT_TITLE = 10;
     private static final int SLOT_EDIT_DESC  = 12;
@@ -176,10 +182,20 @@ public class ManageGui implements Listener {
                         open();
                         return;
                     }
-                    plugin.getDatabase().updatePollTitleDesc(poll.getId(), msg, poll.getDescription());
-                    refreshCache();
-                    send("&a标题已更新为: &f" + msg);
-                    open();
+                    int pollId = poll.getId();
+                    runDatabaseAction(() -> {
+                        Poll current = plugin.getDatabase().loadPoll(pollId);
+                        if (current == null) return null;
+                        plugin.getDatabase().updatePollTitleDesc(pollId, msg, current.getDescription());
+                        return plugin.getDatabase().loadPoll(pollId);
+                    }, fresh -> {
+                        if (fresh == null) {
+                            handleMissingPoll();
+                            return;
+                        }
+                        send("&a标题已更新为: &f" + msg);
+                        open();
+                    });
                 }
                 case "desc" -> {
                     String newDescription = msg.equalsIgnoreCase("clear") ? "" : msg;
@@ -189,10 +205,20 @@ public class ManageGui implements Listener {
                         open();
                         return;
                     }
-                    plugin.getDatabase().updatePollTitleDesc(poll.getId(), poll.getTitle(), newDescription);
-                    refreshCache();
-                    send(newDescription.isEmpty() ? "&a描述已清除。" : "&a描述已更新。");
-                    open();
+                    int pollId = poll.getId();
+                    runDatabaseAction(() -> {
+                        Poll current = plugin.getDatabase().loadPoll(pollId);
+                        if (current == null) return null;
+                        plugin.getDatabase().updatePollTitleDesc(pollId, current.getTitle(), newDescription);
+                        return plugin.getDatabase().loadPoll(pollId);
+                    }, fresh -> {
+                        if (fresh == null) {
+                            handleMissingPoll();
+                            return;
+                        }
+                        send(newDescription.isEmpty() ? "&a描述已清除。" : "&a描述已更新。");
+                        open();
+                    });
                 }
                 case "time" -> {
                     long millis = DurationParser.parseMillis(msg);
@@ -203,18 +229,31 @@ public class ManageGui implements Listener {
                         return;
                     }
                     long newEndsAt = now + millis;
-                    plugin.getDatabase().updatePollEndsAt(poll.getId(), newEndsAt);
-                    refreshCache();
-                    send("&a截止时间已更新，剩余: &f" + DurationParser.format(millis));
-                    open();
+                    int pollId = poll.getId();
+                    runDatabaseAction(() -> {
+                        plugin.getDatabase().updatePollEndsAt(pollId, newEndsAt);
+                        return plugin.getDatabase().loadPoll(pollId);
+                    }, fresh -> {
+                        if (fresh == null) {
+                            handleMissingPoll();
+                            return;
+                        }
+                        send("&a截止时间已更新，剩余: &f" + DurationParser.format(millis));
+                        open();
+                    });
                 }
                 case "confirm_delete" -> {
                     if (!msg.equals("DELETE")) { send("&7已取消删除。"); open(); return; }
-                    plugin.getDatabase().deletePoll(poll.getId());
-                    plugin.getPollCache().removePoll(poll.getId());
-                    unregisterListener();
-                    send("&a议题已删除。");
-                    new MainGui(plugin, player).open();
+                    int pollId = poll.getId();
+                    runDatabaseAction(() -> {
+                        plugin.getDatabase().deletePoll(pollId);
+                        return null;
+                    }, ignored -> {
+                        plugin.getPollCache().removePoll(pollId);
+                        unregisterListener();
+                        send("&a议题已删除。");
+                        new MainGui(plugin, player).open();
+                    });
                 }
             }
         } catch (Exception e) {
@@ -264,16 +303,43 @@ public class ManageGui implements Listener {
         unregisterListener();
     }
 
-    /** 从 DB 重新加载 poll（含最新票数）并更新缓存 */
-    private void refreshCache() {
+    private void runDatabaseAction(DatabaseAction action, Consumer<Poll> onSuccess) {
         try {
-            com.polls.model.Poll fresh = plugin.getDatabase().loadPoll(poll.getId());
-            if (fresh != null) {
-                poll = fresh;
-                plugin.getPollCache().updatePoll(fresh);
-            }
-        } catch (Exception e) {
-            plugin.getLogger().warning("刷新议题缓存失败: " + e.getMessage());
+            plugin.getPlatformAdapter().runAsync(() -> {
+                try {
+                    Poll fresh = action.run();
+                    plugin.getPlatformAdapter().runForPlayer(player, () -> {
+                        if (!plugin.isInputSessionActive(player.getUniqueId(), sessionCancellation)) {
+                            return;
+                        }
+                        if (fresh != null) {
+                            poll = fresh;
+                            plugin.getPollCache().updatePoll(fresh);
+                        }
+                        onSuccess.accept(fresh);
+                    });
+                } catch (Exception e) {
+                    plugin.getLogger().warning("管理操作失败: " + e.getMessage());
+                    plugin.getPlatformAdapter().runForPlayer(player, () -> {
+                        if (!plugin.isInputSessionActive(player.getUniqueId(), sessionCancellation)) {
+                            return;
+                        }
+                        send("&c操作失败，请稍后重试。");
+                        open();
+                    });
+                }
+            });
+        } catch (RuntimeException e) {
+            plugin.getLogger().warning("启动管理操作失败: " + e.getMessage());
+            send("&c操作失败，请稍后重试。");
+            open();
         }
+    }
+
+    private void handleMissingPoll() {
+        plugin.getPollCache().removePoll(poll.getId());
+        unregisterListener();
+        send("&c该议题已不存在。");
+        new MainGui(plugin, player).open();
     }
 }

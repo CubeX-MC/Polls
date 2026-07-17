@@ -49,6 +49,22 @@ class BukkitChatInputListenerTest {
         assertSuppressed(event.isCancelled(), event.getMessage(), event.getRecipients(), processed);
     }
 
+    @Test
+    void suppressesLegacyChatWhenInputHandlerThrows() throws Exception {
+        Player player = player(UUID.fromString("00000000-0000-0000-0000-000000000004"));
+        Listener listener = listener(player, message -> {
+            throw new IllegalStateException("broken input session");
+        });
+        AsyncPlayerChatEvent event = new AsyncPlayerChatEvent(
+                true, player, "private title", new HashSet<>(Set.of(player)));
+
+        invoke(listener, "onAsyncChatInput", AsyncPlayerChatEvent.class, event);
+
+        assertTrue(event.isCancelled());
+        assertEquals("", event.getMessage());
+        assertTrue(event.getRecipients().isEmpty());
+    }
+
     private Listener listener(Player player, AtomicInteger processed) {
         AtomicBoolean processing = new AtomicBoolean();
         Predicate<String> handler = message -> {
@@ -57,6 +73,10 @@ class BukkitChatInputListenerTest {
             }
             return true;
         };
+        return listener(player, handler);
+    }
+
+    private Listener listener(Player player, Predicate<String> handler) {
         return new BukkitAdapter(null).createChatInputListener(player, handler);
     }
 

@@ -129,43 +129,84 @@ public class PaperAdapter implements PlatformAdapter {
 
         private void handlePaperChat(AbstractChatEvent event) {
             if (!event.getPlayer().getUniqueId().equals(playerId)) return;
-            String message = PlainTextComponentSerializer.plainText()
-                    .serialize(event.message())
-                    .trim();
-            if (inputHandler.test(message)) {
-                event.setCancelled(true);
-                event.message(Component.empty());
-                try {
-                    event.viewers().clear();
-                } catch (UnsupportedOperationException ignored) {
-                    // Cancellation still prevents the standard Paper broadcast.
-                }
+            String message;
+            try {
+                message = PlainTextComponentSerializer.plainText()
+                        .serialize(event.message())
+                        .trim();
+            } catch (RuntimeException e) {
+                cancelPaperChat(event);
+                return;
+            }
+            if (shouldConsume(message)) {
+                cancelPaperChat(event);
             }
         }
 
         private void handleLegacyChat(AsyncPlayerChatEvent event) {
             if (!event.getPlayer().getUniqueId().equals(playerId)) return;
-            if (inputHandler.test(event.getMessage().trim())) {
-                event.setCancelled(true);
-                event.setMessage("");
-                try {
-                    event.getRecipients().clear();
-                } catch (UnsupportedOperationException ignored) {
-                    // Cancellation still prevents the standard Bukkit broadcast.
-                }
+            String message;
+            try {
+                message = event.getMessage().trim();
+            } catch (RuntimeException e) {
+                cancelLegacyChat(event);
+                return;
+            }
+            if (shouldConsume(message)) {
+                cancelLegacyChat(event);
             }
         }
 
         private void handleLegacyChat(PlayerChatEvent event) {
             if (!event.getPlayer().getUniqueId().equals(playerId)) return;
-            if (inputHandler.test(event.getMessage().trim())) {
-                event.setCancelled(true);
-                event.setMessage("");
-                try {
-                    event.getRecipients().clear();
-                } catch (UnsupportedOperationException ignored) {
-                    // Cancellation still prevents the standard Bukkit broadcast.
-                }
+            String message;
+            try {
+                message = event.getMessage().trim();
+            } catch (RuntimeException e) {
+                cancelLegacyChat(event);
+                return;
+            }
+            if (shouldConsume(message)) {
+                cancelLegacyChat(event);
+            }
+        }
+
+        private boolean shouldConsume(String message) {
+            try {
+                return inputHandler.test(message);
+            } catch (RuntimeException e) {
+                // A broken input session must never fall through to public chat.
+                return true;
+            }
+        }
+
+        private void cancelPaperChat(AbstractChatEvent event) {
+            event.setCancelled(true);
+            event.message(Component.empty());
+            try {
+                event.viewers().clear();
+            } catch (UnsupportedOperationException ignored) {
+                // Cancellation still prevents the standard Paper broadcast.
+            }
+        }
+
+        private void cancelLegacyChat(AsyncPlayerChatEvent event) {
+            event.setCancelled(true);
+            event.setMessage("");
+            try {
+                event.getRecipients().clear();
+            } catch (UnsupportedOperationException ignored) {
+                // Cancellation still prevents the standard Bukkit broadcast.
+            }
+        }
+
+        private void cancelLegacyChat(PlayerChatEvent event) {
+            event.setCancelled(true);
+            event.setMessage("");
+            try {
+                event.getRecipients().clear();
+            } catch (UnsupportedOperationException ignored) {
+                // Cancellation still prevents the standard Bukkit broadcast.
             }
         }
     }

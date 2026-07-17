@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChatInputCaptureTest {
@@ -28,6 +29,7 @@ class ChatInputCaptureTest {
 
         capture.start();
         assertTrue(player.isConversing());
+        assertTrue(active.get().isModal());
 
         player.acceptConversationInput(" private title ");
 
@@ -36,6 +38,7 @@ class ChatInputCaptureTest {
 
         capture.stop();
         assertFalse(player.isConversing());
+        assertNull(active.get());
     }
 
     private Player player(AtomicReference<Conversation> active, AtomicInteger rawMessages) {

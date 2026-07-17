@@ -8,6 +8,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class PollCacheTest {
 
@@ -29,6 +30,67 @@ class PollCacheTest {
         cache.updateVoteSnapshot(pollWithVotes(4));
         assertEquals(4, totalVotes(cache.getById(1)));
         assertEquals(1, changes.get());
+    }
+
+    @Test
+    void addPollUpsertsByIdInsteadOfCreatingDuplicates() {
+        PollCache cache = new PollCache(null);
+        cache.addPoll(pollWithVotes(1));
+
+        Poll replacement = pollWithVotes(2);
+        replacement.setTitle("Updated question");
+        cache.addPoll(replacement);
+
+        assertEquals(1, cache.getAll().size());
+        assertEquals("Updated question", cache.getById(1).getTitle());
+        assertEquals(2, totalVotes(cache.getById(1)));
+    }
+
+    @Test
+    void voteSnapshotsRejectInconsistentPerOptionCounts() {
+        PollCache cache = new PollCache(null);
+        Poll current = pollWithVotes(3);
+        current.getOptions().get(1).setVoteCount(2);
+        current.setTitle("Current question");
+        cache.addPoll(current);
+
+        Poll stale = pollWithVotes(2);
+        stale.getOptions().get(1).setVoteCount(3);
+        stale.setTitle("Stale question");
+        cache.updateVoteSnapshot(stale);
+
+        Poll result = cache.getById(1);
+        assertEquals("Current question", result.getTitle());
+        assertEquals(3, result.getOptions().get(0).getVoteCount());
+        assertEquals(2, result.getOptions().get(1).getVoteCount());
+        assertEquals(5, totalVotes(result));
+    }
+
+    @Test
+    void managementUpdatesKeepNewerVoteCounts() {
+        PollCache cache = new PollCache(null);
+        cache.addPoll(pollWithVotes(4));
+
+        Poll stale = pollWithVotes(2);
+        stale.setTitle("Edited question");
+        cache.updatePoll(stale);
+
+        Poll result = cache.getById(1);
+        assertEquals("Edited question", result.getTitle());
+        assertEquals(4, totalVotes(result));
+    }
+
+    @Test
+    void deletedPollRejectsLateSnapshotsAndDuplicateAdds() {
+        PollCache cache = new PollCache(null);
+        cache.addPoll(pollWithVotes(1));
+
+        cache.removePoll(1);
+        cache.updateVoteSnapshot(pollWithVotes(2));
+        cache.addPoll(pollWithVotes(3));
+
+        assertNull(cache.getById(1));
+        assertEquals(0, cache.getAll().size());
     }
 
     private Poll pollWithVotes(int voteCount) {

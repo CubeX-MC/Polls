@@ -60,7 +60,7 @@ final class ChatInputCapture {
 
         private SilentConversation(PollsPlugin plugin, Player player, Prompt firstPrompt) {
             super(plugin, player, firstPrompt);
-            modal = false;
+            modal = true;
             localEchoEnabled = false;
         }
 

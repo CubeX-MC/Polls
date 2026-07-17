@@ -93,27 +93,58 @@ public class BukkitAdapter implements PlatformAdapter {
 
         private void handleChat(AsyncPlayerChatEvent event) {
             if (!event.getPlayer().getUniqueId().equals(playerId)) return;
-            if (inputHandler.test(event.getMessage().trim())) {
-                event.setCancelled(true);
-                event.setMessage("");
-                try {
-                    event.getRecipients().clear();
-                } catch (UnsupportedOperationException ignored) {
-                    // Cancellation still prevents the standard Bukkit broadcast.
-                }
+            String message;
+            try {
+                message = event.getMessage().trim();
+            } catch (RuntimeException e) {
+                cancelChat(event);
+                return;
+            }
+            if (shouldConsume(message)) {
+                cancelChat(event);
             }
         }
 
         private void handleChat(PlayerChatEvent event) {
             if (!event.getPlayer().getUniqueId().equals(playerId)) return;
-            if (inputHandler.test(event.getMessage().trim())) {
-                event.setCancelled(true);
-                event.setMessage("");
-                try {
-                    event.getRecipients().clear();
-                } catch (UnsupportedOperationException ignored) {
-                    // Cancellation still prevents the standard Bukkit broadcast.
-                }
+            String message;
+            try {
+                message = event.getMessage().trim();
+            } catch (RuntimeException e) {
+                cancelChat(event);
+                return;
+            }
+            if (shouldConsume(message)) {
+                cancelChat(event);
+            }
+        }
+
+        private boolean shouldConsume(String message) {
+            try {
+                return inputHandler.test(message);
+            } catch (RuntimeException e) {
+                // A broken input session must never fall through to public chat.
+                return true;
+            }
+        }
+
+        private void cancelChat(AsyncPlayerChatEvent event) {
+            event.setCancelled(true);
+            event.setMessage("");
+            try {
+                event.getRecipients().clear();
+            } catch (UnsupportedOperationException ignored) {
+                // Cancellation still prevents the standard Bukkit broadcast.
+            }
+        }
+
+        private void cancelChat(PlayerChatEvent event) {
+            event.setCancelled(true);
+            event.setMessage("");
+            try {
+                event.getRecipients().clear();
+            } catch (UnsupportedOperationException ignored) {
+                // Cancellation still prevents the standard Bukkit broadcast.
             }
         }
     }
