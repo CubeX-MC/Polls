@@ -1,115 +1,177 @@
 # Polls
 
-**让玩家参与服务器决策的民意收集插件 | A simple in-game polling plugin for community decision-making**
+> A lightweight in-game polling plugin for Bukkit, Spigot, Paper, and Folia.
+>
+> 轻量、直观的游戏内民意投票插件，支持 Bukkit、Spigot、Paper 和 Folia。
+
+Players can browse polls, inspect live results, and vote through an inventory GUI. Poll creation and administration are handled entirely in game, with no web panel or external database required.
+
+玩家可以通过 GUI 浏览议题、查看实时票数并参与投票。议题创建与管理也可在游戏内完成，不需要网页面板或外部数据库。
+
+**Requirements / 运行要求:** Minecraft `1.21.4+` · Java `21+`
+
+[Source / 源代码](https://github.com/CubeX-MC/Polls) · [Issue tracker / 问题反馈](https://github.com/CubeX-MC/Polls/issues)
 
 ---
 
-## 简介 | Overview
+## Features / 核心功能
 
-**Polls** 是一款轻量的 Bukkit/Spigot/Paper/Folia 民意调查插件。玩家可以提交议题、投票表决，管理员可在游戏内全程管理，无需借助任何外部工具。插件只做民意收集，不执行任何游戏操作，安全无副作用。
-
-**Polls** is a lightweight polling plugin for Bukkit/Spigot/Paper/Folia servers. Players can create and vote on polls entirely through an in-game GUI. It purely collects opinions — no game mechanics are triggered.
-
----
-
-## 功能 | Features
-
-- 🗳️ **玩家发起投票** — 任意持有权限的玩家均可提交议题，设定标题、描述和截止时长
-- 📋 **自定义选项** — 每个议题支持 2–9 个选项，每个选项可附带详细描述
-- 🏪 **商店风格 GUI** — 主界面按"进行中 / 已结束"分区展示，操作直观
-- 🔒 **一人一票** — 基于玩家 UUID 防重，投票后不可更改
-- 🔔 **管理员通知** — 议题结束时自动通知在线管理员，展示各选项得票率
-- 💾 **SQLite 持久化** — 数据本地存储，30 天后自动清理过期议题
-- ⚙️ **高度可配置** — 标题长度、选项数量、保留天数等均可自定义
-
----
-
-- 🗳️ **Player-created polls** — Any player with permission can submit a poll with title, description, and duration
-- 📋 **Custom options** — 2–9 options per poll, each with an optional detailed description
-- 🏪 **Shop-style GUI** — Main interface splits polls into "Active" and "Ended" sections
-- 🔒 **One vote per player** — UUID-based deduplication; votes cannot be changed
-- 🔔 **Admin notifications** — When a poll ends, online admins receive a summary with vote counts and percentages
-- 💾 **SQLite persistence** — Local storage with automatic cleanup after 30 days
-- ⚙️ **Configurable** — Title length, option count, retention days, and more
+- **Private guided input:** Chat messages used to create or edit a poll are captured by the plugin and never sent to public chat.<br>
+  **私密引导输入：** 创建或编辑议题时，聊天框输入会被插件捕获，不会发送到公共聊天。
+- **Fully in-game workflow:** Create, browse, vote, and manage polls through guided chat input and inventory GUIs.<br>
+  **完整游戏内流程：** 创建、浏览、投票和管理都通过聊天引导与 GUI 完成。
+- **One player, one vote:** UUID-based vote tracking prevents duplicate votes and vote changes.<br>
+  **一人一票：** 使用玩家 UUID 防止重复投票，投票后不可更改。
+- **Live results:** The detail view shows vote counts, percentages, progress bars, and the player's own choice.<br>
+  **实时结果：** 详情界面展示票数、百分比、进度条以及玩家自己的选择。
+- **Flexible polls:** Each poll supports 2 to 9 options with a title, description, option details, and duration.<br>
+  **灵活议题：** 每个议题支持 2 至 9 个选项，可设置标题、描述、选项说明和截止时长。
+- **Administration tools:** Administrators can edit the title or description, extend the deadline, or delete a poll.<br>
+  **管理员工具：** 管理员可修改标题、描述、截止时间，或删除议题。
+- **End notifications:** Online administrators receive a result summary when a poll ends.<br>
+  **结束通知：** 议题结束后，在线管理员会收到票数和占比摘要。
+- **Local persistence:** SQLite stores poll data locally and automatically removes expired records according to the configuration.<br>
+  **本地持久化：** 使用 SQLite 保存数据，并按配置自动清理过期记录。
+- **Multi-platform scheduling:** Paper and Folia use region-aware scheduling APIs, while Bukkit and Spigot use the compatible scheduler.<br>
+  **多平台调度：** Paper 和 Folia 使用区域调度 API，Bukkit 与 Spigot 使用兼容调度器。
 
 ---
 
-## 命令 | Commands
+## Screenshots / 界面预览
 
-| 命令 Command | 说明 Description |
+### Poll browser / 议题列表
+
+![Polls main interface](https://raw.githubusercontent.com/CubeX-MC/Polls/main/images/20260714-045849.png)
+
+Active and ended polls are displayed in separate sections with independent pagination.
+
+进行中与已结束议题分区展示，并分别支持翻页。
+
+### Poll details and results / 议题详情与结果
+
+![Poll details and voting results](https://raw.githubusercontent.com/CubeX-MC/Polls/main/images/20260714-045852.jpg)
+
+Players can inspect option descriptions, live counts, percentages, and their own vote.
+
+玩家可以查看选项说明、实时票数、百分比以及自己的投票记录。
+
+### Option editor / 选项管理
+
+![Poll option editor](https://raw.githubusercontent.com/CubeX-MC/Polls/main/images/20260714-045843.jpg)
+
+Poll creators can add, review, or remove options before submitting the poll. At least two options are required.
+
+创建议题时可添加、查看或移除选项，至少需要两个选项。
+
+---
+
+## Workflow / 使用流程
+
+### Vote / 参与投票
+
+1. Run `/polls` to open the main interface.
+2. Select an active or ended poll.
+3. Click an option to vote, or inspect the final results.
+
+中文说明：输入 `/polls` 打开主界面，选择议题后即可投票或查看最终结果。
+
+### Create a poll / 创建议题
+
+1. Click **Create Poll** in the bottom-right corner of the main interface.
+2. Enter the title, description, and duration in chat. Supported examples include `30m`, `12h`, and `3d`.
+3. Add 2 to 9 options and optional descriptions.
+4. Confirm the poll in the option editor.
+
+The guided setup captures every input privately before publishing the poll.
+
+中文说明：点击主界面右下角的“提交新议题”，按聊天提示填写标题、描述、截止时长与选项，最后在选项管理界面确认提交。所有输入均为私密输入。
+
+---
+
+## Commands / 命令
+
+| Command / 命令 | Description / 说明 |
 |---|---|
-| `/polls` | 打开投票主界面 Open the polls GUI |
+| `/polls` | Open the polls GUI / 打开投票主界面 |
 
----
+## Permissions / 权限
 
-## 权限 | Permissions
-
-| 节点 Node | 默认 Default | 说明 Description |
+| Permission / 权限 | Default / 默认值 | Description / 说明 |
 |---|---|---|
-| `polls.submit` | 所有玩家 Everyone | 提交投票议题 Submit a poll |
-| `polls.vote` | 所有玩家 Everyone | 参与投票 Cast a vote |
-| `polls.admin` | OP | 管理议题（编辑/删除/修改截止时间）Manage polls |
+| `polls.submit` | Everyone / 所有玩家 | Create polls / 创建投票议题 |
+| `polls.vote` | Everyone / 所有玩家 | Cast votes / 参与投票 |
+| `polls.admin` | OP | Edit, extend, or delete polls / 编辑、延期或删除议题 |
+
+The administrator permission node can be changed in `config.yml`.
+
+管理员权限节点可在 `config.yml` 中修改。
 
 ---
 
-## 兼容性 | Compatibility
+## Compatibility / 兼容性
 
-| 服务端 Platform | 版本 Version | 状态 Status |
+| Platform / 平台 | Version / 支持版本 | Runtime / 运行方式 |
 |---|---|---|
-| Bukkit | 1.21+ | ✅ |
-| Spigot | 1.21+ | ✅ |
-| Paper | 1.21+ | ✅ 自动启用 Adventure API Auto Adventure API |
-| Folia | 1.21+ | ✅ 区域线程支持 Region-threaded |
+| Bukkit | `1.21.4+` | Compatible Bukkit scheduler / Bukkit 兼容调度器 |
+| Spigot | `1.21.4+` | Compatible Bukkit scheduler / Bukkit 兼容调度器 |
+| Paper | `1.21.4+` | Adventure API and region schedulers / Adventure API 与区域调度器 |
+| Folia | `1.21.4+` | Native entity, global, and async schedulers / 原生实体、全局与异步调度器 |
 
-插件在启动时自动检测服务端类型，Paper 环境下启用 Adventure API 和异步调度器优化。
+The platform adapter is selected automatically. On Folia, the plugin fails safely instead of falling back to an incompatible Bukkit scheduler.
 
-The plugin auto-detects the server type at startup. On Paper, Adventure API and async scheduler optimizations are enabled automatically.
-
----
-
-## 安装 | Installation
-
-1. 将 `Polls-*.jar` 放入 `plugins/` 目录
-   Drop `Polls-*.jar` into your `plugins/` folder
-2. 重启服务器 | Restart the server
-3. 按需编辑 `plugins/Polls/config.yml`
-   Edit `plugins/Polls/config.yml` as needed
+插件会自动选择平台适配器。在 Folia 环境中，如果适配器初始化失败，插件会安全停止，而不会回退到不兼容的 Bukkit 调度器。
 
 ---
 
-## 配置 | Configuration
+## Installation / 安装
+
+1. Download a `Polls-*.jar` compatible with your server version.
+2. Place the JAR in the server's `plugins/` directory.
+3. Restart the server.
+4. Edit `plugins/Polls/config.yml` if needed, then restart the server to apply the changes.
+
+中文说明：下载 JAR 并放入 `plugins/` 目录后重启服务器。修改生成的配置文件后，再次重启服务器使配置生效。
+
+---
+
+## Configuration / 配置
 
 ```yaml
-# 投票数据保留天数 | Days to retain poll data
+# Days to retain ended polls / 投票结束后保留数据的天数
 data-retention-days: 30
 
-# 管理员权限节点 | Admin permission node
+# Administrator permission node / 管理员权限节点
 admin-permission: polls.admin
 
-# 每个议题最多选项数 | Max options per poll
+# Maximum options per poll, valid range: 2-9 / 每个议题最多选项数
 max-options: 9
 
-# 议题标题最大字符数 | Max title length
+# Text length limits / 文本长度限制
 max-title-length: 40
-
-# 选项名称最大字符数 | Max option label length
 max-option-label-length: 40
-
-# 议题描述最大字符数 | Max description length
 max-description-length: 200
-
-# 选项描述最大字符数 | Max option description length
 max-option-desc-length: 100
 ```
 
 ---
 
-## 数据存储 | Data Storage
+## Data and notifications / 数据与通知
 
-使用 SQLite，数据库文件为 `plugins/Polls/polls.db`，无需额外数据库服务。
-
-Uses SQLite. Database file is located at `plugins/Polls/polls.db` — no external database required.
+- Poll data is stored in `plugins/Polls/polls.db`; MySQL or another database service is not required.<br>
+  投票数据保存在本地 SQLite 文件中，不需要 MySQL 或其他数据库服务。
+- Creating and voting on polls does not broadcast messages to the whole server.<br>
+  议题创建和投票过程不会向全服广播。
+- Only online administrators receive a result summary when a poll ends.<br>
+  议题结束时，仅在线管理员会收到结果摘要。
+- Polls older than `data-retention-days` are removed automatically.<br>
+  超过配置保留时间的议题会自动清理。
+- bStats is used for anonymous usage metrics. Poll content and vote records are never uploaded.<br>
+  插件使用 bStats 收集匿名使用统计，不会上传议题内容或投票记录。
 
 ---
 
-*由 CubeXMC 开发 | Developed by CubeXMC*
+Polls collects and displays community feedback only. It never executes commands or changes gameplay automatically based on a result.
+
+Polls 只负责收集和展示玩家意见，不会根据投票结果自动执行服务器命令或修改游戏内容。
+
+*Developed by CubeXMC / 由 CubeXMC 开发*
