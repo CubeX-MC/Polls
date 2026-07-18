@@ -3,7 +3,6 @@ package com.polls.gui;
 import com.polls.PollsPlugin;
 import com.polls.model.Poll;
 import com.polls.model.PollOption;
-import com.polls.util.DurationParser;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -68,7 +67,7 @@ public class MainGui implements Listener {
         removeCacheListener = plugin.getPollCache().addChangeListener(this::onCacheChanged);
         refreshSnapshots();
 
-        inv = Bukkit.createInventory(null, 54, color("&8[ &6民意投票 &8]"));
+        inv = Bukkit.createInventory(null, 54, color(text("main.title")));
         populate();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         player.openInventory(inv);
@@ -96,22 +95,25 @@ public class MainGui implements Listener {
 
     private void populate() {
         inv.clear();
-        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, "&8 ", List.of());
+        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, text("main.filler"), List.of());
         for (int i = 0; i < 54; i++) inv.setItem(i, filler);
 
         // 标题栏
-        inv.setItem(4, makeItem(Material.PAPER, "&6&l民意投票", List.of(
-                color("&7查看和参与当前议题"),
-                color("&7右下角可提交新议题")
+        inv.setItem(4, makeItem(Material.PAPER, text("main.header.name"), List.of(
+                color(text("main.header.lore.view")),
+                color(text("main.header.lore.submit"))
         )));
 
         // 分隔行（第3行）
-        ItemStack divider = makeItem(Material.BLACK_STAINED_GLASS_PANE, "&8——— 已结束 ———", List.of());
+        ItemStack divider = makeItem(Material.BLACK_STAINED_GLASS_PANE,
+                text("main.divider.ended"), List.of());
         for (int i = 27; i < 36; i++) inv.setItem(i, divider);
 
         // 区域标签
-        inv.setItem(9, makeItem(Material.LIME_STAINED_GLASS_PANE, "&a▶ 进行中", List.of()));
-        inv.setItem(36, makeItem(Material.RED_STAINED_GLASS_PANE, "&7▶ 已结束", List.of()));
+        inv.setItem(9, makeItem(Material.LIME_STAINED_GLASS_PANE,
+                text("main.section.active"), List.of()));
+        inv.setItem(36, makeItem(Material.RED_STAINED_GLASS_PANE,
+                text("main.section.ended"), List.of()));
 
         // 进行中（槽位 10-21，12格）
         int activeSlot = ACTIVE_START + 1;
@@ -135,8 +137,8 @@ public class MainGui implements Listener {
 
         // 提交按钮
         if (player.hasPermission("polls.submit")) {
-            inv.setItem(SUBMIT_SLOT, makeItem(Material.WRITABLE_BOOK, "&e+ 提交新议题",
-                    List.of(color("&7点击发起一个新的投票议题"))));
+            inv.setItem(SUBMIT_SLOT, makeItem(Material.WRITABLE_BOOK, text("main.submit.name"),
+                    List.of(color(text("main.submit.lore")))));
         }
     }
 
@@ -144,12 +146,18 @@ public class MainGui implements Listener {
                                  int previousSlot, int pageSlot, int nextSlot) {
         int pages = pageCount(itemCount, pageSize);
         if (page > 0) {
-            inv.setItem(previousSlot, makeItem(Material.ARROW, "&e上一页", List.of()));
+            inv.setItem(previousSlot, makeItem(Material.ARROW,
+                    text("main.pagination.previous"), List.of()));
         }
-        inv.setItem(pageSlot, makeItem(Material.MAP, "&f第 " + (page + 1) + " / " + pages + " 页",
-                List.of(color("&7共 " + itemCount + " 个议题"))));
+        inv.setItem(pageSlot, makeItem(Material.MAP,
+                text("main.pagination.indicator",
+                        "page", String.valueOf(page + 1),
+                        "pages", String.valueOf(pages)),
+                List.of(color(text("main.pagination.total",
+                        "count", String.valueOf(itemCount))))));
         if (page + 1 < pages) {
-            inv.setItem(nextSlot, makeItem(Material.ARROW, "&e下一页", List.of()));
+            inv.setItem(nextSlot, makeItem(Material.ARROW,
+                    text("main.pagination.next"), List.of()));
         }
     }
 
@@ -161,20 +169,23 @@ public class MainGui implements Listener {
         Material mat = active ? Material.LIME_DYE : Material.GRAY_DYE;
         List<String> lore = new ArrayList<>();
         if (!poll.getDescription().isBlank()) {
-            lore.addAll(wrapText(poll.getDescription(), 30, "&7"));
+            lore.addAll(wrapText(poll.getDescription(), 30,
+                    text("main.poll.description-prefix")));
             lore.add(" ");
         }
-        lore.add(color("&8提交者: &f" + poll.getCreatorName()));
+        lore.add(color(text("main.poll.creator", "creator", poll.getCreatorName())));
         if (active) {
-            lore.add(color("&a剩余: &f" + DurationParser.format(poll.getRemainingMillis())));
+            lore.add(color(text("main.poll.remaining",
+                    "duration", plugin.getLanguageManager().duration(poll.getRemainingMillis()))));
         } else {
-            lore.add(color("&7已结束"));
+            lore.add(color(text("main.poll.ended")));
         }
         int total = poll.getOptions().stream().mapToInt(PollOption::getVoteCount).sum();
-        lore.add(color("&8总票数: &f" + total));
+        lore.add(color(text("main.poll.total-votes", "count", String.valueOf(total))));
         lore.add(" ");
-        lore.add(color(active ? "&e▶ 点击参与投票" : "&7▶ 点击查看结果"));
-        return makeItem(mat, (active ? "&a" : "&7") + poll.getTitle(), lore);
+        lore.add(color(text(active ? "main.poll.action.vote" : "main.poll.action.results")));
+        return makeItem(mat, text(active ? "main.poll.title.active" : "main.poll.title.ended",
+                "title", poll.getTitle()), lore);
     }
 
     @EventHandler
@@ -259,5 +270,9 @@ public class MainGui implements Listener {
         removeCacheListener.run();
         removeCacheListener = () -> {};
         HandlerList.unregisterAll(this);
+    }
+
+    private String text(String key, String... replacements) {
+        return plugin.getLanguageManager().text(key, replacements);
     }
 }

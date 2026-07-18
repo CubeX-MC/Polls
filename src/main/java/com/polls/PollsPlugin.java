@@ -3,13 +3,16 @@ package com.polls;
 import com.polls.db.Database;
 import com.polls.db.PollCache;
 import com.polls.gui.MainGui;
+import com.polls.i18n.LanguageManager;
 import com.polls.platform.PlatformAdapter;
 import com.polls.platform.BukkitAdapter;
 import org.bstats.bukkit.Metrics;
+import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Locale;
@@ -22,25 +25,31 @@ public class PollsPlugin extends JavaPlugin implements CommandExecutor {
     private PollCache pollCache;
     private PollScheduler scheduler;
     private PlatformAdapter platformAdapter;
+    private LanguageManager languageManager;
     private final ConcurrentHashMap<UUID, Runnable> inputSessions = new ConcurrentHashMap<>();
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         getDataFolder().mkdirs();
+        if (!getConfig().contains("language", true)) {
+            getConfig().set("language", LanguageManager.DEFAULT_LANGUAGE);
+            saveConfig();
+        }
+        languageManager = new LanguageManager(this);
 
         platformAdapter = createPlatformAdapter();
         if (platformAdapter == null) {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        getLogger().info("当前平台: " + platformAdapter.getPlatformName());
+        getLogger().info(languageManager.text("log.platform", "platform", platformAdapter.getPlatformName()));
 
         database = new Database(this);
         try {
             database.init();
         } catch (Exception e) {
-            getLogger().severe("数据库初始化失败: " + e.getMessage());
+            getLogger().severe(languageManager.text("log.database_init_failed", "error", e.getMessage()));
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
@@ -53,15 +62,20 @@ public class PollsPlugin extends JavaPlugin implements CommandExecutor {
 
         var pollsCommand = getCommand("polls");
         if (pollsCommand == null) {
-            getLogger().severe("plugin.yml 中缺少 polls 命令，插件无法启动。");
+            getLogger().severe(languageManager.text("log.command_missing"));
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
         pollsCommand.setExecutor(this);
+        pollsCommand.setDescription(languageManager.text("command.description"));
+        pollsCommand.setUsage(languageManager.text("command.usage"));
+        localizePermission("polls.submit", "permission.submit");
+        localizePermission("polls.vote", "permission.vote");
+        localizePermission("polls.admin", "permission.admin");
 
         new Metrics(this, 32574);
 
-        getLogger().info("Polls 已启动。");
+        getLogger().info(languageManager.text("log.enabled", "language", languageManager.getLanguageCode()));
     }
 
     @Override
@@ -72,17 +86,17 @@ public class PollsPlugin extends JavaPlugin implements CommandExecutor {
             try {
                 cancellation.run();
             } catch (RuntimeException e) {
-                getLogger().warning("清理输入会话失败: " + e.getMessage());
+                getLogger().warning(message("log.input_cleanup_failed", "error", e.getMessage()));
             }
         }
         if (database != null) database.close();
-        getLogger().info("Polls 已停止。");
+        getLogger().info(message("log.disabled"));
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("§c只有玩家才能使用此命令。");
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', message("player.only_players")));
             return true;
         }
         cancelInputSession(player.getUniqueId());
@@ -92,6 +106,7 @@ public class PollsPlugin extends JavaPlugin implements CommandExecutor {
 
     public Database getDatabase() { return database; }
     public PollCache getPollCache() { return pollCache; }
+    public LanguageManager getLanguageManager() { return languageManager; }
     public String getAdminPermission() {
         return getConfig().getString("admin-permission", "polls.admin");
     }
@@ -128,17 +143,16 @@ public class PollsPlugin extends JavaPlugin implements CommandExecutor {
                     .newInstance(this);
         } catch (ClassNotFoundException e) {
             if (isFoliaServer()) {
-                getLogger().severe("检测到 Folia，但缺少区域调度器 API，插件无法安全启动。");
+                getLogger().severe(languageManager.text("log.folia_api_missing"));
                 return null;
             }
             return new BukkitAdapter(this);
         } catch (ReflectiveOperationException | LinkageError e) {
             if (isFoliaServer()) {
-                getLogger().severe("Folia 适配器初始化失败，拒绝回退到不兼容的 Bukkit 调度器: "
-                        + e.getMessage());
+                getLogger().severe(languageManager.text("log.folia_adapter_failed", "error", e.getMessage()));
                 return null;
             }
-            getLogger().warning("Paper/Folia 适配器初始化失败，将使用 Bukkit 调度器: " + e.getMessage());
+            getLogger().warning(languageManager.text("log.paper_adapter_fallback", "error", e.getMessage()));
             return new BukkitAdapter(this);
         }
     }
@@ -146,5 +160,16 @@ public class PollsPlugin extends JavaPlugin implements CommandExecutor {
     private boolean isFoliaServer() {
         String serverName = getServer().getName();
         return serverName != null && serverName.toLowerCase(Locale.ROOT).contains("folia");
+    }
+
+    private void localizePermission(String permissionName, String messageKey) {
+        Permission permission = getServer().getPluginManager().getPermission(permissionName);
+        if (permission != null) {
+            permission.setDescription(languageManager.text(messageKey));
+        }
+    }
+
+    private String message(String key, Object... replacements) {
+        return languageManager == null ? key : languageManager.text(key, replacements);
     }
 }

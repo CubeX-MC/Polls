@@ -72,59 +72,70 @@ public class SubmitFlow implements Listener {
         step = 0;
         player.closeInventory();
         chatInputCapture.start();
-        send("&e请在聊天框输入议题&6标题&e（最多 " + plugin.getConfig().getInt("max-title-length", 40) + " 字）");
-        send("&7输入 &ccancel &7取消");
+        send(text("submit.prompt.title", "max",
+                Integer.toString(plugin.getConfig().getInt("max-title-length", 40))));
+        send(text("submit.prompt.cancel"));
     }
 
     private void startStep1() {
         step = 1;
         chatInputCapture.start();
-        send("&e请输入议题&6描述&e，输入 &fskip &e跳过");
+        send(text("submit.prompt.description"));
     }
 
     private void startStep2() {
         step = 2;
         chatInputCapture.start();
-        send("&e请输入&6截止时长&e，格式：&f30m &7/ &f12h &7/ &f3d &7（仅支持单个单位）");
+        send(text("submit.prompt.duration"));
     }
 
     private void openOptionManager() {
         step = 3;
         chatInputCapture.stop();
         int rows = 4;
-        optionInv = Bukkit.createInventory(null, rows * 9, color("&8[ &6添加选项 &8]"));
+        optionInv = Bukkit.createInventory(null, rows * 9, color(text("submit.options.title")));
         refreshOptionManager();
         player.openInventory(optionInv);
     }
 
     private void refreshOptionManager() {
         optionInv.clear();
-        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, "&8 ", List.of());
+        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE,
+                text("submit.options.filler"), List.of());
         for (int i = 0; i < optionInv.getSize(); i++) optionInv.setItem(i, filler);
 
         // 已添加的选项
         for (int i = 0; i < options.size(); i++) {
             String[] opt = options.get(i);
             List<String> lore = new ArrayList<>();
-            if (!opt[1].isBlank()) lore.add(color("&7" + opt[1]));
-            lore.add(color("&8点击&c删除"));
-            optionInv.setItem(i, makeItem(Material.PAPER, "&f" + opt[0], lore));
+            if (!opt[1].isBlank()) {
+                lore.add(color(text("submit.options.entry.description", "description", opt[1])));
+            }
+            lore.add(color(text("submit.options.entry.remove")));
+            optionInv.setItem(i, makeItem(Material.PAPER,
+                    text("submit.options.entry.name", "option", opt[0]), lore));
         }
 
         // 添加按钮
         int maxOptions = Math.clamp(plugin.getConfig().getInt("max-options", 9), 2, 9);
         if (options.size() < maxOptions) {
-            optionInv.setItem(27, makeItem(Material.LIME_DYE, "&a+ 添加选项",
-                    List.of(color("&7点击添加新选项"))));
+            optionInv.setItem(27, makeItem(Material.LIME_DYE, text("submit.options.add.name"),
+                    List.of(color(text("submit.options.add.lore")))));
         }
 
         // 完成按钮（至少2个选项）
         if (options.size() >= 2) {
-            optionInv.setItem(35, makeItem(Material.EMERALD, "&a✔ 完成提交",
-                    List.of(color("&7共 " + options.size() + " 个选项"), color("&7点击提交议题"))));
+            optionInv.setItem(35, makeItem(Material.EMERALD, text("submit.options.finish.name"),
+                    List.of(
+                            color(text("submit.options.finish.count", "count",
+                                    Integer.toString(options.size()))),
+                            color(text("submit.options.finish.lore"))
+                    )));
         } else {
-            optionInv.setItem(35, makeItem(Material.BARRIER, "&c至少需要 2 个选项",
-                    List.of(color("&7还需添加 " + (2 - options.size()) + " 个选项"))));
+            optionInv.setItem(35, makeItem(Material.BARRIER,
+                    text("submit.options.minimum.name", "minimum", "2"),
+                    List.of(color(text("submit.options.minimum.remaining", "remaining",
+                            Integer.toString(2 - options.size()))))));
         }
     }
 
@@ -132,14 +143,14 @@ public class SubmitFlow implements Listener {
         step = 4;
         player.closeInventory();
         chatInputCapture.start();
-        send("&e请输入&6选项名称&e（简短标题）");
-        send("&7输入 &cback &7返回");
+        send(text("submit.prompt.option-label"));
+        send(text("submit.prompt.back"));
     }
 
     private void startOptionDescInput() {
         step = 5;
         chatInputCapture.start();
-        send("&e请输入&6选项描述&e，输入 &fskip &e跳过");
+        send(text("submit.prompt.option-description"));
     }
 
     // ─── 事件处理 ───
@@ -172,9 +183,9 @@ public class SubmitFlow implements Listener {
         switch (inputStep) {
             case 0 -> {
                 int max = plugin.getConfig().getInt("max-title-length", 40);
-                if (msg.isEmpty()) { retry(inputStep, "&c标题不能为空"); return; }
+                if (msg.isEmpty()) { retry(inputStep, text("submit.error.title-empty")); return; }
                 if (msg.length() > max) {
-                    retry(inputStep, "&c标题过长（最多 " + max + " 字）");
+                    retry(inputStep, text("submit.error.title-too-long", "max", Integer.toString(max)));
                     return;
                 }
                 title = msg;
@@ -184,7 +195,8 @@ public class SubmitFlow implements Listener {
                 String newDescription = msg.equalsIgnoreCase("skip") ? "" : msg;
                 int max = plugin.getConfig().getInt("max-description-length", 200);
                 if (newDescription.length() > max) {
-                    retry(inputStep, "&c描述过长（最多 " + max + " 字）");
+                    retry(inputStep, text("submit.error.description-too-long", "max",
+                            Integer.toString(max)));
                     return;
                 }
                 description = newDescription;
@@ -194,7 +206,7 @@ public class SubmitFlow implements Listener {
                 long millis = DurationParser.parseMillis(msg);
                 long now = System.currentTimeMillis();
                 if (millis <= 0 || millis > Long.MAX_VALUE - now) {
-                    retry(inputStep, "&c格式或时长有误，示例：30m / 12h / 3d");
+                    retry(inputStep, text("submit.error.duration-invalid"));
                     return;
                 }
                 endsAt = now + millis;
@@ -206,9 +218,10 @@ public class SubmitFlow implements Listener {
                     return;
                 }
                 int max = plugin.getConfig().getInt("max-option-label-length", 40);
-                if (msg.isEmpty()) { retry(inputStep, "&c选项名称不能为空"); return; }
+                if (msg.isEmpty()) { retry(inputStep, text("submit.error.option-label-empty")); return; }
                 if (msg.length() > max) {
-                    retry(inputStep, "&c选项名称过长（最多 " + max + " 字）");
+                    retry(inputStep, text("submit.error.option-label-too-long", "max",
+                            Integer.toString(max)));
                     return;
                 }
                 pendingOptionLabel = msg;
@@ -218,7 +231,8 @@ public class SubmitFlow implements Listener {
                 String optionDescription = msg.equalsIgnoreCase("skip") ? "" : msg;
                 int max = plugin.getConfig().getInt("max-option-desc-length", 100);
                 if (optionDescription.length() > max) {
-                    retry(inputStep, "&c描述过长（最多 " + max + " 字）");
+                    retry(inputStep, text("submit.error.description-too-long", "max",
+                            Integer.toString(max)));
                     return;
                 }
                 options.add(new String[]{pendingOptionLabel, optionDescription});
@@ -297,11 +311,11 @@ public class SubmitFlow implements Listener {
                 Poll newPoll = plugin.getDatabase().loadPoll(pollId);
                 if (newPoll != null) plugin.getPollCache().addPoll(newPoll);
                 plugin.getPlatformAdapter().runForPlayer(player,
-                        () -> send("&a议题提交成功！使用 &e/polls &a查看。"));
+                        () -> send(text("submit.success")));
             } catch (Exception e) {
-                plugin.getLogger().severe("提交议题失败: " + e.getMessage());
+                plugin.getLogger().severe(text("log.submit_failed", "error", e.getMessage()));
                 plugin.getPlatformAdapter().runForPlayer(player,
-                        () -> send("&c提交失败，请联系管理员。"));
+                        () -> send(text("submit.error.failed")));
             }
         });
     }
@@ -310,7 +324,7 @@ public class SubmitFlow implements Listener {
         step = STEP_PROCESSING;
         unregisterListeners();
         if (closeInventory) player.closeInventory();
-        send("&c已取消提交。");
+        send(text("submit.cancelled"));
     }
 
     private void cancelReplacedSession() {
@@ -329,5 +343,9 @@ public class SubmitFlow implements Listener {
 
     private void send(String msg) {
         plugin.getPlatformAdapter().sendMessage(player, msg);
+    }
+
+    private String text(String key, String... replacements) {
+        return plugin.getLanguageManager().text(key, replacements);
     }
 }

@@ -34,6 +34,8 @@ Players can browse polls, inspect live results, and vote through an inventory GU
   **本地持久化：** 使用 SQLite 保存数据，并按配置自动清理过期记录。
 - **Multi-platform scheduling:** Paper and Folia use region-aware scheduling APIs, while Bukkit and Spigot use the compatible scheduler.<br>
   **多平台调度：** Paper 和 Folia 使用区域调度 API，Bukkit 与 Spigot 使用兼容调度器。
+- **Built-in languages:** Switch between English (`en_US`) and Simplified Chinese (`zh_CN`) in `config.yml`.<br>
+  **内置语言：** 可在 `config.yml` 中切换英文（`en_US`）和简体中文（`zh_CN`）。
 
 ---
 
@@ -137,6 +139,9 @@ The platform adapter is selected automatically. On Folia, the plugin fails safel
 ## Configuration / 配置
 
 ```yaml
+# Interface language: en_US or zh_CN / 界面语言
+language: zh_CN
+
 # Days to retain ended polls / 投票结束后保留数据的天数
 data-retention-days: 30
 
@@ -152,6 +157,9 @@ max-option-label-length: 40
 max-description-length: 200
 max-option-desc-length: 100
 ```
+
+Editable language files are created at `plugins/Polls/lang/zh_CN.yml` and `plugins/Polls/lang/en_US.yml` on first startup. Existing installations receive `language: zh_CN` automatically; restart the server after changing it.<br>
+首次启动后会生成可编辑的 `plugins/Polls/lang/zh_CN.yml` 与 `plugins/Polls/lang/en_US.yml`。旧版本升级时会自动补入 `language: zh_CN`；修改后请重启服务器。
 
 ---
 

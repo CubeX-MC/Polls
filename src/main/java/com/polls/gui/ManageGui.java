@@ -66,7 +66,7 @@ public class ManageGui implements Listener {
     public void open() {
         chatInputCapture.stop();
         inputProcessing = false;
-        inv = Bukkit.createInventory(null, 36, color("&8[ &c管理议题 &8]"));
+        inv = Bukkit.createInventory(null, 36, color(text("manage.title")));
         populate();
         if (!registered) {
             Bukkit.getPluginManager().registerEvents(this, plugin);
@@ -79,35 +79,47 @@ public class ManageGui implements Listener {
 
     private void populate() {
         inv.clear();
-        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, "&8 ", List.of());
+        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, text("manage.filler"), List.of());
         for (int i = 0; i < 36; i++) inv.setItem(i, filler);
 
         // 当前议题信息
         List<String> infoLore = new ArrayList<>();
         if (poll.getDescription().isBlank()) {
-            infoLore.add(color("&7（无描述）"));
+            infoLore.add(color(text("manage.poll.no-description")));
         } else {
-            infoLore.addAll(wrapText(poll.getDescription(), 30, "&7"));
+            infoLore.addAll(wrapText(poll.getDescription(), 30,
+                    text("manage.poll.description-prefix")));
         }
-        infoLore.add(color("&8截止: &f" + DurationParser.format(poll.getRemainingMillis())));
-        inv.setItem(4, makeItem(Material.BOOK, "&e" + poll.getTitle(), infoLore));
+        infoLore.add(color(text("manage.poll.deadline", "duration",
+                plugin.getLanguageManager().duration(poll.getRemainingMillis()))));
+        inv.setItem(4, makeItem(Material.BOOK,
+                text("manage.poll.title", "title", poll.getTitle()), infoLore));
 
-        inv.setItem(SLOT_EDIT_TITLE, makeItem(Material.NAME_TAG, "&e修改标题",
-                List.of(color("&7当前: &f" + poll.getTitle()), color("&7点击后在聊天框输入新标题"))));
+        inv.setItem(SLOT_EDIT_TITLE, makeItem(Material.NAME_TAG, text("manage.edit-title.name"),
+                List.of(
+                        color(text("manage.edit-title.current", "title", poll.getTitle())),
+                        color(text("manage.edit-title.lore"))
+                )));
 
-        inv.setItem(SLOT_EDIT_DESC, makeItem(Material.WRITABLE_BOOK, "&e修改描述",
-                List.of(color("&7当前: &f" + (poll.getDescription().isBlank() ? "（空）" : poll.getDescription())),
-                        color("&7点击后输入新描述，输入 &fclear &7可清除"))));
+        String currentDescription = poll.getDescription().isBlank()
+                ? text("manage.edit-description.current-empty")
+                : text("manage.edit-description.current", "description", poll.getDescription());
+        inv.setItem(SLOT_EDIT_DESC, makeItem(Material.WRITABLE_BOOK,
+                text("manage.edit-description.name"),
+                List.of(color(currentDescription), color(text("manage.edit-description.lore")))));
 
-        inv.setItem(SLOT_EDIT_TIME, makeItem(Material.CLOCK, "&e修改截止时间",
-                List.of(color("&7当前剩余: &f" + DurationParser.format(poll.getRemainingMillis())),
-                        color("&7点击后输入新的截止时长，如 &f3d"),
-                        color("&7将从&f现在&7起重新计算"))));
+        inv.setItem(SLOT_EDIT_TIME, makeItem(Material.CLOCK, text("manage.edit-time.name"),
+                List.of(
+                        color(text("manage.edit-time.current", "duration",
+                                plugin.getLanguageManager().duration(poll.getRemainingMillis()))),
+                        color(text("manage.edit-time.lore-input")),
+                        color(text("manage.edit-time.lore-reset"))
+                )));
 
-        inv.setItem(SLOT_DELETE, makeItem(Material.TNT, "&c删除议题",
-                List.of(color("&c⚠ 不可恢复！"), color("&7点击后输入 &fDELETE &7确认"))));
+        inv.setItem(SLOT_DELETE, makeItem(Material.TNT, text("manage.delete.name"),
+                List.of(color(text("manage.delete.warning")), color(text("manage.delete.lore")))));
 
-        inv.setItem(SLOT_BACK, makeItem(Material.ARROW, "&7← 返回", List.of()));
+        inv.setItem(SLOT_BACK, makeItem(Material.ARROW, text("manage.back"), List.of()));
     }
 
     @EventHandler
@@ -119,16 +131,16 @@ public class ManageGui implements Listener {
         if (!player.hasPermission(plugin.getAdminPermission())) {
             unregisterListener();
             player.closeInventory();
-            send("&c你没有管理议题的权限。");
+            send(text("manage.error.no-permission"));
             return;
         }
 
         int slot = event.getRawSlot();
         switch (slot) {
-            case SLOT_EDIT_TITLE -> startInput("title", "&e请输入新的议题标题：");
-            case SLOT_EDIT_DESC  -> startInput("desc",  "&e请输入新的议题描述，输入 &fclear &e可清除：");
-            case SLOT_EDIT_TIME  -> startInput("time",  "&e请输入新的截止时长（如 &f3d&e / &f12h&e / &f30m&e，仅支持单个单位）：");
-            case SLOT_DELETE     -> startInput("confirm_delete", "&c输入 &fDELETE &c确认删除议题，输入其他取消：");
+            case SLOT_EDIT_TITLE -> startInput("title", text("manage.prompt.title"));
+            case SLOT_EDIT_DESC  -> startInput("desc", text("manage.prompt.description"));
+            case SLOT_EDIT_TIME  -> startInput("time", text("manage.prompt.time"));
+            case SLOT_DELETE     -> startInput("confirm_delete", text("manage.prompt.delete"));
             case SLOT_BACK       -> goBack();
         }
     }
@@ -141,7 +153,7 @@ public class ManageGui implements Listener {
         player.closeInventory();
         chatInputCapture.start();
         send(prompt);
-        send("&7输入 &ccancel &7取消");
+        send(text("manage.prompt.cancel"));
     }
 
     private boolean consumeChatInput(String message) {
@@ -164,7 +176,7 @@ public class ManageGui implements Listener {
     private void handleInput(String action, String msg) {
         if (!player.hasPermission(plugin.getAdminPermission())) {
             unregisterListener();
-            send("&c你没有管理议题的权限。");
+            send(text("manage.error.no-permission"));
             return;
         }
         if (msg.equalsIgnoreCase("cancel")) {
@@ -175,25 +187,26 @@ public class ManageGui implements Listener {
         try {
             switch (action) {
                 case "title" -> {
-                    if (msg.isEmpty()) { send("&c标题不能为空"); open(); return; }
+                    if (msg.isEmpty()) { send(text("manage.error.title-empty")); open(); return; }
                     int max = plugin.getConfig().getInt("max-title-length", 40);
                     if (msg.length() > max) {
-                        send("&c标题过长（最多 " + max + " 字）");
+                        send(text("manage.error.title-too-long", "max", Integer.toString(max)));
                         open();
                         return;
                     }
                     int pollId = poll.getId();
                     runDatabaseAction(() -> {
-                        Poll current = plugin.getDatabase().loadPoll(pollId);
-                        if (current == null) return null;
-                        plugin.getDatabase().updatePollTitleDesc(pollId, msg, current.getDescription());
+                        plugin.getDatabase().updatePollTitle(pollId, msg);
                         return plugin.getDatabase().loadPoll(pollId);
+                    }, fresh -> {
+                        if (fresh == null) plugin.getPollCache().removePoll(pollId);
+                        else plugin.getPollCache().updatePollTitle(pollId, msg);
                     }, fresh -> {
                         if (fresh == null) {
                             handleMissingPoll();
                             return;
                         }
-                        send("&a标题已更新为: &f" + msg);
+                        send(text("manage.success.title", "title", msg));
                         open();
                     });
                 }
@@ -201,22 +214,25 @@ public class ManageGui implements Listener {
                     String newDescription = msg.equalsIgnoreCase("clear") ? "" : msg;
                     int max = plugin.getConfig().getInt("max-description-length", 200);
                     if (newDescription.length() > max) {
-                        send("&c描述过长（最多 " + max + " 字）");
+                        send(text("manage.error.description-too-long", "max", Integer.toString(max)));
                         open();
                         return;
                     }
                     int pollId = poll.getId();
                     runDatabaseAction(() -> {
-                        Poll current = plugin.getDatabase().loadPoll(pollId);
-                        if (current == null) return null;
-                        plugin.getDatabase().updatePollTitleDesc(pollId, current.getTitle(), newDescription);
+                        plugin.getDatabase().updatePollDescription(pollId, newDescription);
                         return plugin.getDatabase().loadPoll(pollId);
+                    }, fresh -> {
+                        if (fresh == null) plugin.getPollCache().removePoll(pollId);
+                        else plugin.getPollCache().updatePollDescription(pollId, newDescription);
                     }, fresh -> {
                         if (fresh == null) {
                             handleMissingPoll();
                             return;
                         }
-                        send(newDescription.isEmpty() ? "&a描述已清除。" : "&a描述已更新。");
+                        send(text(newDescription.isEmpty()
+                                ? "manage.success.description-cleared"
+                                : "manage.success.description-updated"));
                         open();
                     });
                 }
@@ -224,7 +240,7 @@ public class ManageGui implements Listener {
                     long millis = DurationParser.parseMillis(msg);
                     long now = System.currentTimeMillis();
                     if (millis <= 0 || millis > Long.MAX_VALUE - now) {
-                        send("&c格式或时长有误，示例: 3d / 12h / 30m");
+                        send(text("manage.error.duration-invalid"));
                         open();
                         return;
                     }
@@ -234,31 +250,38 @@ public class ManageGui implements Listener {
                         plugin.getDatabase().updatePollEndsAt(pollId, newEndsAt);
                         return plugin.getDatabase().loadPoll(pollId);
                     }, fresh -> {
+                        if (fresh == null) plugin.getPollCache().removePoll(pollId);
+                        else plugin.getPollCache().updatePollEndsAt(pollId, newEndsAt);
+                    }, fresh -> {
                         if (fresh == null) {
                             handleMissingPoll();
                             return;
                         }
-                        send("&a截止时间已更新，剩余: &f" + DurationParser.format(millis));
+                        send(text("manage.success.time", "duration",
+                                plugin.getLanguageManager().duration(millis)));
                         open();
                     });
                 }
                 case "confirm_delete" -> {
-                    if (!msg.equals("DELETE")) { send("&7已取消删除。"); open(); return; }
+                    if (!msg.equals("DELETE")) {
+                        send(text("manage.delete.cancelled"));
+                        open();
+                        return;
+                    }
                     int pollId = poll.getId();
                     runDatabaseAction(() -> {
                         plugin.getDatabase().deletePoll(pollId);
                         return null;
-                    }, ignored -> {
-                        plugin.getPollCache().removePoll(pollId);
+                    }, ignored -> plugin.getPollCache().removePoll(pollId), ignored -> {
                         unregisterListener();
-                        send("&a议题已删除。");
+                        send(text("manage.success.deleted"));
                         new MainGui(plugin, player).open();
                     });
                 }
             }
         } catch (Exception e) {
-            send("&c操作失败，请联系服务器管理员。");
-            plugin.getLogger().severe("管理操作失败: " + e.getMessage());
+            send(text("manage.error.operation"));
+            plugin.getLogger().severe(text("log.manage_failed", "error", e.getMessage()));
             open();
         }
     }
@@ -303,35 +326,37 @@ public class ManageGui implements Listener {
         unregisterListener();
     }
 
-    private void runDatabaseAction(DatabaseAction action, Consumer<Poll> onSuccess) {
+    private void runDatabaseAction(DatabaseAction action, Consumer<Poll> cacheUpdate,
+                                   Consumer<Poll> onSuccess) {
         try {
             plugin.getPlatformAdapter().runAsync(() -> {
                 try {
                     Poll fresh = action.run();
+                    cacheUpdate.accept(fresh);
                     plugin.getPlatformAdapter().runForPlayer(player, () -> {
                         if (!plugin.isInputSessionActive(player.getUniqueId(), sessionCancellation)) {
                             return;
                         }
                         if (fresh != null) {
-                            poll = fresh;
-                            plugin.getPollCache().updatePoll(fresh);
+                            Poll cached = plugin.getPollCache().getById(fresh.getId());
+                            poll = cached != null ? cached : fresh;
                         }
                         onSuccess.accept(fresh);
                     });
                 } catch (Exception e) {
-                    plugin.getLogger().warning("管理操作失败: " + e.getMessage());
+                    plugin.getLogger().warning(text("log.manage_failed", "error", e.getMessage()));
                     plugin.getPlatformAdapter().runForPlayer(player, () -> {
                         if (!plugin.isInputSessionActive(player.getUniqueId(), sessionCancellation)) {
                             return;
                         }
-                        send("&c操作失败，请稍后重试。");
+                        send(text("manage.error.retry"));
                         open();
                     });
                 }
             });
         } catch (RuntimeException e) {
-            plugin.getLogger().warning("启动管理操作失败: " + e.getMessage());
-            send("&c操作失败，请稍后重试。");
+            plugin.getLogger().warning(text("log.manage_start_failed", "error", e.getMessage()));
+            send(text("manage.error.retry"));
             open();
         }
     }
@@ -339,7 +364,11 @@ public class ManageGui implements Listener {
     private void handleMissingPoll() {
         plugin.getPollCache().removePoll(poll.getId());
         unregisterListener();
-        send("&c该议题已不存在。");
+        send(text("manage.error.missing"));
         new MainGui(plugin, player).open();
+    }
+
+    private String text(String key, String... replacements) {
+        return plugin.getLanguageManager().text(key, replacements);
     }
 }

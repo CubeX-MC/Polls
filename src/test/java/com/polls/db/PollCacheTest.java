@@ -81,6 +81,22 @@ class PollCacheTest {
     }
 
     @Test
+    void managementFieldUpdatesDoNotOverwriteEachOther() {
+        PollCache cache = new PollCache(null);
+        cache.addPoll(pollWithVotes(4));
+
+        cache.updatePollTitle(1, "Updated title");
+        cache.updatePollDescription(1, "Updated description");
+        cache.updatePollEndsAt(1, 12345L);
+
+        Poll result = cache.getById(1);
+        assertEquals("Updated title", result.getTitle());
+        assertEquals("Updated description", result.getDescription());
+        assertEquals(12345L, result.getEndsAt());
+        assertEquals(4, totalVotes(result));
+    }
+
+    @Test
     void deletedPollRejectsLateSnapshotsAndDuplicateAdds() {
         PollCache cache = new PollCache(null);
         cache.addPoll(pollWithVotes(1));

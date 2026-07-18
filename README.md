@@ -14,6 +14,7 @@
 - 一人一票，不可更改
 - 纯民意收集，不执行任何游戏操作
 - 数据 SQLite 持久化，保存 30 天后自动清理
+- 内置简体中文和英文，可通过配置文件切换
 
 ---
 
@@ -80,6 +81,9 @@
 `config.yml`：
 
 ```yaml
+# 界面语言：zh_CN（简体中文）或 en_US（English）
+language: zh_CN
+
 # 投票数据保留天数（最小为 1）
 data-retention-days: 30
 
@@ -101,6 +105,9 @@ max-description-length: 200
 # 每个选项描述最大字符数
 max-option-desc-length: 100
 ```
+
+首次启动后可编辑 `plugins/Polls/lang/zh_CN.yml` 和 `plugins/Polls/lang/en_US.yml`。
+从旧版本升级时，插件会自动补入 `language: zh_CN`；修改语言后需重启服务器。
 
 ---
 

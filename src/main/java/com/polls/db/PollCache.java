@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 public class PollCache {
 
@@ -43,7 +44,8 @@ public class PollCache {
             cache = new CopyOnWriteArrayList<>(merged);
             notifyChanged();
         } catch (SQLException e) {
-            plugin.getLogger().severe("加载议题缓存失败: " + e.getMessage());
+            plugin.getLogger().severe(plugin.getLanguageManager().text(
+                    "log.cache_load_failed", "error", e.getMessage()));
         }
     }
 
@@ -76,6 +78,18 @@ public class PollCache {
                 return;
             }
         }
+    }
+
+    public synchronized void updatePollTitle(int pollId, String title) {
+        updateMetadata(pollId, poll -> poll.setTitle(title));
+    }
+
+    public synchronized void updatePollDescription(int pollId, String description) {
+        updateMetadata(pollId, poll -> poll.setDescription(description));
+    }
+
+    public synchronized void updatePollEndsAt(int pollId, long endsAt) {
+        updateMetadata(pollId, poll -> poll.setEndsAt(endsAt));
     }
 
     /**
@@ -148,6 +162,19 @@ public class PollCache {
         return merged;
     }
 
+    private void updateMetadata(int pollId, Consumer<Poll> update) {
+        if (deletedPollIds.contains(pollId)) return;
+        for (int i = 0; i < cache.size(); i++) {
+            Poll current = cache.get(i);
+            if (current.getId() != pollId) continue;
+            Poll updated = mergePoll(current, current, false);
+            update.accept(updated);
+            cache.set(i, updated);
+            notifyChanged();
+            return;
+        }
+    }
+
     private Map<Integer, PollOption> byId(Poll poll) {
         Map<Integer, PollOption> result = new HashMap<>();
         for (PollOption option : poll.getOptions()) result.put(option.getId(), option);
@@ -188,7 +215,8 @@ public class PollCache {
             try {
                 listener.run();
             } catch (RuntimeException e) {
-                plugin.getLogger().warning("刷新投票界面失败: " + e.getMessage());
+                plugin.getLogger().warning(plugin.getLanguageManager().text(
+                        "log.cache_listener_failed", "error", e.getMessage()));
             }
         }
     }

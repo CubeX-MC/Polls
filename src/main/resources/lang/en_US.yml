@@ -1,0 +1,229 @@
+# Polls English language file
+# You may edit this file directly. Existing files are not overwritten on restart or upgrade.
+
+common:
+  filler: '&8 '
+
+player:
+  only_players: '&cOnly players can use this command.'
+
+command:
+  description: 'Open the poll menu'
+  usage: '/polls'
+
+permission:
+  submit: 'Submit poll proposals'
+  vote: 'Vote in polls'
+  admin: 'Manage poll content, deadlines, and deletion'
+
+main:
+  title: '&8[ &6Polls &8]'
+  filler: '&8 '
+  header:
+    name: '&6&lPolls'
+    lore:
+      view: '&7View and participate in current polls'
+      submit: '&7Submit a new poll from the bottom-right corner'
+  divider:
+    ended: '&8——— Ended ———'
+  section:
+    active: '&a▶ Active'
+    ended: '&7▶ Ended'
+  submit:
+    name: '&e+ Submit a Poll'
+    lore: '&7Click to create a new poll'
+  pagination:
+    previous: '&ePrevious Page'
+    indicator: '&fPage {page} / {pages}'
+    total: '&7{count} polls total'
+    next: '&eNext Page'
+  poll:
+    description-prefix: '&7'
+    creator: '&8Submitted by: &f{creator}'
+    remaining: '&aRemaining: &f{duration}'
+    ended: '&7Ended'
+    total-votes: '&8Total votes: &f{count}'
+    action:
+      vote: '&e▶ Click to vote'
+      results: '&7▶ Click to view results'
+    title:
+      active: '&a{title}'
+      ended: '&7{title}'
+
+detail:
+  title: '&8[ &6Poll Details &8]'
+  filler: '&8 '
+  loading: '&eLoading the latest vote count...'
+  back: '&7← Back to Polls'
+  load-failed:
+    name: '&cFailed to Load Votes'
+    lore: '&7Go back and try again'
+  poll:
+    title: '&e&l{title}'
+    description-prefix: '&f'
+    creator: '&8Submitted by: &7{creator}'
+    remaining: '&aRemaining: &f{duration}'
+    status:
+      active: '&7Status: &aActive'
+      ended: '&7Status: &cEnded'
+    total-votes: '&8Total votes: &f{count}'
+  manage:
+    name: '&cManage This Poll'
+    lore:
+      edit: '&7Edit or delete this poll'
+      deadline: '&7Change the deadline'
+  option:
+    description-prefix: '&7'
+    votes: '&8Votes: &f{count} &7({percent}%)'
+    voted:
+      active: '&a✔ You voted for this option'
+      ended: '&a✔ Your vote was for this option'
+    action:
+      vote: '&e▶ Click to vote'
+    title:
+      voted: '&a{option}'
+      ended: '&7{option}'
+      active: '&f{option}'
+    bar:
+      start: '&8['
+      filled: '&a■'
+      empty: '&7■'
+      end: '&8]'
+  message:
+    not-found: '&cThis poll no longer exists.'
+    vote-pending: '&eRecording your vote, please wait...'
+    no-permission: '&cYou do not have permission to vote.'
+    already-voted: '&cYou have already voted and cannot change your vote.'
+    poll-ended: '&cThis poll has ended.'
+    option-invalid: '&cThis option is no longer valid. Reopen the menu.'
+    refresh-failed: '&cFailed to refresh the results. Reopen the menu.'
+    vote-success: '&aVote recorded: &f{option}'
+    vote-failed: '&cVoting failed. Please try again later.'
+
+manage:
+  title: '&8[ &cManage Poll &8]'
+  filler: '&8 '
+  poll:
+    title: '&e{title}'
+    no-description: '&7(No description)'
+    description-prefix: '&7'
+    deadline: '&8Deadline: &f{duration}'
+  edit-title:
+    name: '&eEdit Title'
+    current: '&7Current: &f{title}'
+    lore: '&7Click, then enter a new title in chat'
+  edit-description:
+    name: '&eEdit Description'
+    current-empty: '&7Current: &f(Empty)'
+    current: '&7Current: &f{description}'
+    lore: '&7Enter a new description, or type &fclear &7to remove it'
+  edit-time:
+    name: '&eChange Deadline'
+    current: '&7Time remaining: &f{duration}'
+    lore-input: '&7Enter a new duration, such as &f3d'
+    lore-reset: '&7The deadline will be recalculated from &fnow'
+  delete:
+    name: '&cDelete Poll'
+    warning: '&c⚠ This cannot be undone!'
+    lore: '&7Type &fDELETE &7to confirm'
+    cancelled: '&7Deletion cancelled.'
+  back: '&7← Back'
+  prompt:
+    title: '&eEnter the new poll title:'
+    description: '&eEnter a new description, or type &fclear &eto remove it:'
+    time: '&eEnter a new duration, such as &f3d&e / &f12h&e / &f30m&e (one unit only):'
+    delete: '&cType &fDELETE &cto delete this poll, or anything else to cancel:'
+    cancel: '&7Type &ccancel &7to cancel'
+  error:
+    no-permission: '&cYou do not have permission to manage polls.'
+    title-empty: '&cThe title cannot be empty.'
+    title-too-long: '&cThe title is too long (maximum {max} characters).'
+    description-too-long: '&cThe description is too long (maximum {max} characters).'
+    duration-invalid: '&cInvalid duration. Examples: 3d / 12h / 30m'
+    operation: '&cThe operation failed. Contact a server administrator.'
+    retry: '&cThe operation failed. Please try again later.'
+    missing: '&cThis poll no longer exists.'
+  success:
+    title: '&aTitle updated to: &f{title}'
+    description-cleared: '&aDescription cleared.'
+    description-updated: '&aDescription updated.'
+    time: '&aDeadline updated. Remaining: &f{duration}'
+    deleted: '&aPoll deleted.'
+
+submit:
+  prompt:
+    title: '&eEnter the poll &6title&e (maximum {max} characters)'
+    cancel: '&7Type &ccancel &7to cancel'
+    description: '&eEnter the poll &6description&e, or type &fskip &eto skip it'
+    duration: '&eEnter the &6duration&e: &f30m &7/ &f12h &7/ &f3d &7(one unit only)'
+    option-label: '&eEnter the &6option name&e (a short title)'
+    back: '&7Type &cback &7to go back'
+    option-description: '&eEnter the &6option description&e, or type &fskip &eto skip it'
+  options:
+    title: '&8[ &6Add Options &8]'
+    filler: '&8 '
+    entry:
+      name: '&f{option}'
+      description: '&7{description}'
+      remove: '&8Click to &cremove'
+    add:
+      name: '&a+ Add Option'
+      lore: '&7Click to add a new option'
+    finish:
+      name: '&a✔ Finish and Submit'
+      count: '&7{count} options added'
+      lore: '&7Click to submit the poll'
+    minimum:
+      name: '&cAt least {minimum} options are required'
+      remaining: '&7Add {remaining} more options'
+  error:
+    title-empty: '&cThe title cannot be empty.'
+    title-too-long: '&cThe title is too long (maximum {max} characters).'
+    description-too-long: '&cThe description is too long (maximum {max} characters).'
+    duration-invalid: '&cInvalid duration. Examples: 30m / 12h / 3d'
+    option-label-empty: '&cThe option name cannot be empty.'
+    option-label-too-long: '&cThe option name is too long (maximum {max} characters).'
+    failed: '&cSubmission failed. Contact a server administrator.'
+  success: '&aPoll submitted! Use &e/polls &ato view it.'
+  cancelled: '&cPoll submission cancelled.'
+
+scheduler:
+  ended:
+    header: '&8[&6Polls&8] &ePoll ended: &f{title} &8| &7Total votes: &f{total} &8|'
+    option: ' &a{label}: &f{count} &7({percent}%)'
+
+duration:
+  ended: 'Ended'
+  days: '{value}d'
+  hours: '{value}h'
+  minutes: '{value}m'
+  seconds: '{value}s'
+  separator: ' '
+
+log:
+  platform: 'Current platform: {platform}'
+  database_init_failed: 'Database initialization failed: {error}'
+  command_missing: 'The polls command is missing from plugin.yml; the plugin cannot start.'
+  enabled: 'Polls enabled. Language: {language}'
+  input_cleanup_failed: 'Failed to clean up an input session: {error}'
+  disabled: 'Polls disabled.'
+  folia_api_missing: 'Folia was detected, but its region scheduler API is unavailable. The plugin cannot start safely.'
+  folia_adapter_failed: 'The Folia adapter failed to initialize; refusing to use an incompatible Bukkit scheduler: {error}'
+  paper_adapter_fallback: 'The Paper/Folia adapter failed to initialize; using the Bukkit scheduler: {error}'
+  cache_load_failed: 'Failed to load the poll cache: {error}'
+  cache_listener_failed: 'Failed to refresh a poll menu: {error}'
+  detail_load_failed: 'Failed to load poll details: {error}'
+  vote_failed: 'Voting failed: {error}'
+  submit_failed: 'Poll submission failed: {error}'
+  manage_failed: 'Poll management operation failed: {error}'
+  manage_start_failed: 'Failed to start a poll management operation: {error}'
+  maintenance_failed: 'Poll maintenance task failed: {error}'
+  maintenance_start_failed: 'Failed to start the poll maintenance task: {error}'
+  expired_cleanup_failed: 'Failed to delete expired polls: {error}'
+  expired_confirm_failed: 'Failed to confirm an expired poll deletion; it will be retried: {error}'
+  poll_load_retry: 'Failed to load poll data; it will be retried: {error}'
+  notification_failed: 'Failed to send the poll result notification; it will be retried: {error}'
+  expired_cleaned: 'Deleted {count} expired polls'
+  maintenance_result_failed: 'Failed to schedule poll maintenance results: {error}'
+  orphan_data_cleaned: 'Deleted {count} historical orphan records'
+  database_close_failed: 'Failed to close the database connection: {error}'

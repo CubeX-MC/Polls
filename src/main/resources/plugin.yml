@@ -2,23 +2,23 @@ name: Polls
 version: '${project.version}'
 main: com.polls.PollsPlugin
 api-version: '1.21'
-# Paper API 作为软依赖，运行时自动检测并启用
+# Paper API is detected at runtime / Paper API 在运行时自动检测
 folia-supported: true
-description: 玩家民意收集插件
+description: Community polling plugin / 玩家民意收集插件
 authors: [CubeXMC]
 
 commands:
   polls:
-    description: 打开投票主界面
+    description: Open the poll menu / 打开投票主界面
     usage: /polls
 
 permissions:
   polls.submit:
-    description: 提交投票议题
+    description: Submit poll proposals / 提交投票议题
     default: true
   polls.vote:
-    description: 参与投票
+    description: Vote in polls / 参与投票
     default: true
   polls.admin:
-    description: 管理员权限：管理议题（删除/修改内容/修改时间）
+    description: Manage poll content, deadlines, and deletion / 管理议题内容、截止时间和删除操作
     default: op

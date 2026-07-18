@@ -52,12 +52,12 @@ public class PollScheduler {
                     runMaintenanceAsync();
                 } catch (RuntimeException e) {
                     maintenanceRunning.set(false);
-                    plugin.getLogger().warning("议题维护任务失败: " + e.getMessage());
+                    plugin.getLogger().warning(text("log.maintenance_failed", "error", e.getMessage()));
                 }
             });
         } catch (RuntimeException e) {
             maintenanceRunning.set(false);
-            plugin.getLogger().warning("启动议题维护任务失败: " + e.getMessage());
+            plugin.getLogger().warning(text("log.maintenance_start_failed", "error", e.getMessage()));
         }
     }
 
@@ -84,7 +84,7 @@ public class PollScheduler {
         } catch (SQLException e) {
             // Do not remove cache entries if the delete did not complete.
             deleteSucceeded = false;
-            plugin.getLogger().severe("清理过期议题失败: " + e.getMessage());
+            plugin.getLogger().severe(text("log.expired_cleanup_failed", "error", e.getMessage()));
         }
 
         // Confirm IDs against the database after the DELETE. An administrator may
@@ -97,8 +97,8 @@ public class PollScheduler {
                         expiredIds.add(pollId);
                     }
                 } catch (SQLException e) {
-                    plugin.getLogger().warning("确认过期议题删除状态失败，将在下次维护时重试: "
-                            + e.getMessage());
+                    plugin.getLogger().warning(text("log.expired_confirm_failed",
+                            "error", e.getMessage()));
                 }
             }
         }
@@ -145,7 +145,7 @@ public class PollScheduler {
                 }
             } catch (SQLException e) {
                 // Keep the entry unmarked so a transient database failure retries next cycle.
-                plugin.getLogger().warning("加载议题数据失败，将在下次维护时重试: " + e.getMessage());
+                plugin.getLogger().warning(text("log.poll_load_retry", "error", e.getMessage()));
             }
         }
 
@@ -176,14 +176,15 @@ public class PollScheduler {
                             // Mark only after the fresh result was successfully dispatched.
                             notifiedEndTimes.put(ended.getId(), ended.getEndsAt());
                         } catch (RuntimeException e) {
-                            plugin.getLogger().warning("通知议题结束结果失败，将在下次维护时重试: "
-                                    + e.getMessage());
+                            plugin.getLogger().warning(text("log.notification_failed",
+                                    "error", e.getMessage()));
                         }
                     }
                     notifiedEndTimes.keySet().retainAll(currentIds);
                     lastActiveStates.keySet().retainAll(currentIds);
                     if (deletedCount > 0) {
-                        plugin.getLogger().info("清理过期议题 " + deletedCount + " 条");
+                        plugin.getLogger().info(text("log.expired_cleaned",
+                                "count", Integer.toString(deletedCount)));
                     }
                 } finally {
                     maintenanceRunning.set(false);
@@ -191,19 +192,25 @@ public class PollScheduler {
             });
         } catch (RuntimeException e) {
             maintenanceRunning.set(false);
-            plugin.getLogger().warning("调度议题维护结果失败: " + e.getMessage());
+            plugin.getLogger().warning(text("log.maintenance_result_failed", "error", e.getMessage()));
         }
     }
 
     private void notifyAdmins(Poll poll) {
         int totalVotes = poll.getOptions().stream().mapToInt(o -> o.getVoteCount()).sum();
-        StringBuilder sb = new StringBuilder();
-        sb.append("&8[&6Polls&8] &e议题已结束: &f").append(poll.getTitle())
-          .append(" &8| &7总票数: &f").append(totalVotes).append(" &8|");
+        StringBuilder sb = new StringBuilder(text(
+                "scheduler.ended.header",
+                "title", poll.getTitle(),
+                "total", Integer.toString(totalVotes)
+        ));
         poll.getOptions().forEach(opt -> {
             double pct = totalVotes > 0 ? (opt.getVoteCount() * 100.0 / totalVotes) : 0;
-            sb.append(" &a").append(opt.getLabel()).append(": &f").append(opt.getVoteCount())
-              .append(" &7(").append(String.format(java.util.Locale.ROOT, "%.1f", pct)).append("%)");
+            sb.append(text(
+                    "scheduler.ended.option",
+                    "label", opt.getLabel(),
+                    "count", Integer.toString(opt.getVoteCount()),
+                    "percent", String.format(java.util.Locale.ROOT, "%.1f", pct)
+            ));
         });
         String msg = sb.toString();
         for (Player p : Bukkit.getOnlinePlayers()) {
@@ -213,6 +220,10 @@ public class PollScheduler {
                 }
             });
         }
+    }
+
+    private String text(String key, String... replacements) {
+        return plugin.getLanguageManager().text(key, replacements);
     }
 
 }

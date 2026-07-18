@@ -107,7 +107,8 @@ public class Database {
                     """);
         }
         if (deleted > 0) {
-            plugin.getLogger().info("清理历史孤儿数据 " + deleted + " 条");
+            plugin.getLogger().info(plugin.getLanguageManager().text(
+                    "log.orphan_data_cleaned", "count", Integer.toString(deleted)));
         }
     }
 
@@ -363,12 +364,20 @@ public class Database {
 
     // ─── 议题管理 ───
 
-    public synchronized void updatePollTitleDesc(int pollId, String title, String description) throws SQLException {
-        String sql = "UPDATE polls SET title = ?, description = ? WHERE id = ?";
+    public synchronized void updatePollTitle(int pollId, String title) throws SQLException {
+        String sql = "UPDATE polls SET title = ? WHERE id = ?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, title);
-            ps.setString(2, description);
-            ps.setInt(3, pollId);
+            ps.setInt(2, pollId);
+            ps.executeUpdate();
+        }
+    }
+
+    public synchronized void updatePollDescription(int pollId, String description) throws SQLException {
+        String sql = "UPDATE polls SET description = ? WHERE id = ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, description);
+            ps.setInt(2, pollId);
             ps.executeUpdate();
         }
     }
@@ -404,7 +413,8 @@ public class Database {
         try {
             if (connection != null && !connection.isClosed()) connection.close();
         } catch (SQLException e) {
-            plugin.getLogger().warning("关闭数据库连接失败: " + e.getMessage());
+            plugin.getLogger().warning(plugin.getLanguageManager().text(
+                    "log.database_close_failed", "error", e.getMessage()));
         }
     }
 }

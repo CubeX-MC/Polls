@@ -3,7 +3,6 @@ package com.polls.gui;
 import com.polls.PollsPlugin;
 import com.polls.model.Poll;
 import com.polls.model.PollOption;
-import com.polls.util.DurationParser;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -18,6 +17,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import static com.polls.gui.GuiUtils.color;
 import static com.polls.gui.GuiUtils.makeItem;
@@ -54,7 +54,7 @@ public class DetailGui implements Listener {
     }
 
     public void open() {
-        inv = Bukkit.createInventory(null, 36, color("&8[ &6议题详情 &8]"));
+        inv = Bukkit.createInventory(null, 36, color(text("detail.title")));
         showLoading();
         open = true;
         removeCacheListener = plugin.getPollCache().addChangeListener(this::onCacheChanged);
@@ -65,11 +65,12 @@ public class DetailGui implements Listener {
 
     private void showLoading() {
         inv.clear();
-        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, "&8 ", List.of());
+        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, text("detail.filler"), List.of());
         for (int i = 0; i < 36; i++) inv.setItem(i, filler);
-        inv.setItem(4, makeItem(Material.BOOK, "&e&l" + poll.getTitle(), List.of()));
-        inv.setItem(13, makeItem(Material.CLOCK, "&e正在读取最新票数...", List.of()));
-        inv.setItem(BACK_SLOT, makeItem(Material.ARROW, "&7← 返回列表", List.of()));
+        inv.setItem(4, makeItem(Material.BOOK,
+                text("detail.poll.title", "title", poll.getTitle()), List.of()));
+        inv.setItem(13, makeItem(Material.CLOCK, text("detail.loading"), List.of()));
+        inv.setItem(BACK_SLOT, makeItem(Material.ARROW, text("detail.back"), List.of()));
     }
 
     private void loadLatest() {
@@ -86,7 +87,7 @@ public class DetailGui implements Listener {
                 plugin.getPlatformAdapter().runForPlayer(player, () -> {
                     if (!isViewing()) return;
                     if (fresh == null) {
-                        send("&c该议题已不存在。");
+                        send(text("detail.message.not-found"));
                         goBack();
                         return;
                     }
@@ -97,11 +98,11 @@ public class DetailGui implements Listener {
                     populate();
                 });
             } catch (Exception e) {
-                plugin.getLogger().warning("加载议题详情失败: " + e.getMessage());
+                plugin.getLogger().warning(text("log.detail_load_failed", "error", e.getMessage()));
                 plugin.getPlatformAdapter().runForPlayer(player, () -> {
                     if (!isViewing()) return;
-                    inv.setItem(13, makeItem(Material.BARRIER, "&c票数加载失败",
-                            List.of(color("&7请返回后重试"))));
+                    inv.setItem(13, makeItem(Material.BARRIER, text("detail.load-failed.name"),
+                            List.of(color(text("detail.load-failed.lore")))));
                 });
             }
         });
@@ -120,25 +121,28 @@ public class DetailGui implements Listener {
 
     private void populate() {
         inv.clear();
-        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, "&8 ", List.of());
+        ItemStack filler = makeItem(Material.GRAY_STAINED_GLASS_PANE, text("detail.filler"), List.of());
         for (int i = 0; i < 36; i++) inv.setItem(i, filler);
 
         // 议题信息格（槽位4）
         List<String> infoLore = new ArrayList<>();
         if (!poll.getDescription().isBlank()) {
-            infoLore.addAll(wrapText(poll.getDescription(), 30, "&f"));
+            infoLore.addAll(wrapText(poll.getDescription(), 30,
+                    text("detail.poll.description-prefix")));
             infoLore.add(" ");
         }
-        infoLore.add(color("&8提交者: &7" + poll.getCreatorName()));
+        infoLore.add(color(text("detail.poll.creator", "creator", poll.getCreatorName())));
         if (poll.isActive()) {
-            infoLore.add(color("&a剩余: &f" + DurationParser.format(poll.getRemainingMillis())));
-            infoLore.add(color("&7状态: &a进行中"));
+            infoLore.add(color(text("detail.poll.remaining",
+                    "duration", plugin.getLanguageManager().duration(poll.getRemainingMillis()))));
+            infoLore.add(color(text("detail.poll.status.active")));
         } else {
-            infoLore.add(color("&7状态: &c已结束"));
+            infoLore.add(color(text("detail.poll.status.ended")));
         }
         int totalVotes = poll.getOptions().stream().mapToInt(PollOption::getVoteCount).sum();
-        infoLore.add(color("&8总票数: &f" + totalVotes));
-        inv.setItem(4, makeItem(Material.BOOK, "&e&l" + poll.getTitle(), infoLore));
+        infoLore.add(color(text("detail.poll.total-votes", "count", String.valueOf(totalVotes))));
+        inv.setItem(4, makeItem(Material.BOOK,
+                text("detail.poll.title", "title", poll.getTitle()), infoLore));
 
         // 选项（槽位 9-17，最多9个）
         List<PollOption> opts = poll.getOptions();
@@ -149,12 +153,13 @@ public class DetailGui implements Listener {
         }
 
         // 返回按钮
-        inv.setItem(BACK_SLOT, makeItem(Material.ARROW, "&7← 返回列表", List.of()));
+        inv.setItem(BACK_SLOT, makeItem(Material.ARROW, text("detail.back"), List.of()));
 
         // 管理员管理按钮
         if (player.hasPermission(plugin.getAdminPermission())) {
-            inv.setItem(MANAGE_SLOT, makeItem(Material.NETHER_STAR, "&c管理此议题",
-                    List.of(color("&7修改/删除议题"), color("&7修改截止时间"))));
+            inv.setItem(MANAGE_SLOT, makeItem(Material.NETHER_STAR, text("detail.manage.name"),
+                    List.of(color(text("detail.manage.lore.edit")),
+                            color(text("detail.manage.lore.deadline")))));
         }
     }
 
@@ -163,44 +168,53 @@ public class DetailGui implements Listener {
 
         // 选项描述
         if (!opt.getDescription().isBlank()) {
-            lore.addAll(wrapText(opt.getDescription(), 30, "&7"));
+            lore.addAll(wrapText(opt.getDescription(), 30,
+                    text("detail.option.description-prefix")));
             lore.add(" ");
         }
 
         // 票数和占比
         int count = opt.getVoteCount();
         double pct = totalVotes > 0 ? (count * 100.0 / totalVotes) : 0;
-        lore.add(color("&8票数: &f" + count + " &7(" + String.format("%.1f", pct) + "%)"));
+        lore.add(color(text("detail.option.votes",
+                "count", String.valueOf(count),
+                "percent", String.format(Locale.ROOT, "%.1f", pct))));
         lore.add(buildBar(pct));
 
         if (playerVoted) {
             lore.add(" ");
-            lore.add(color(active ? "&a✔ 你已投此选项" : "&a✔ 你投给了此选项"));
+            lore.add(color(text(active
+                    ? "detail.option.voted.active"
+                    : "detail.option.voted.ended")));
         } else if (active) {
             lore.add(" ");
-            lore.add(color("&e▶ 点击投票"));
+            lore.add(color(text("detail.option.action.vote")));
         }
 
         Material mat;
-        String prefix;
+        String titleKey;
         if (playerVoted) {
             mat = Material.LIME_WOOL;
-            prefix = "&a";
+            titleKey = "detail.option.title.voted";
         } else if (!active) {
             mat = Material.LIGHT_GRAY_WOOL;
-            prefix = "&7";
+            titleKey = "detail.option.title.ended";
         } else {
             mat = Material.WHITE_WOOL;
-            prefix = "&f";
+            titleKey = "detail.option.title.active";
         }
-        return makeItem(mat, prefix + opt.getLabel(), lore);
+        return makeItem(mat, text(titleKey, "option", opt.getLabel()), lore);
     }
 
     private String buildBar(double pct) {
         int filled = (int) Math.round(pct / 10);
-        StringBuilder bar = new StringBuilder("&8[");
-        for (int i = 0; i < 10; i++) bar.append(i < filled ? "&a■" : "&7■");
-        bar.append("&8]");
+        StringBuilder bar = new StringBuilder(text("detail.option.bar.start"));
+        for (int i = 0; i < 10; i++) {
+            bar.append(text(i < filled
+                    ? "detail.option.bar.filled"
+                    : "detail.option.bar.empty"));
+        }
+        bar.append(text("detail.option.bar.end"));
         return color(bar.toString());
     }
 
@@ -216,7 +230,7 @@ public class DetailGui implements Listener {
 
         if (slot == BACK_SLOT) {
             if (votePending) {
-                send("&e正在记录投票，请稍候...");
+                send(text("detail.message.vote-pending"));
                 return;
             }
             goBack(); return;
@@ -233,7 +247,7 @@ public class DetailGui implements Listener {
         // 选项槽位 9-17
         if (dataLoaded && slot >= 9 && slot <= 17 && poll.isActive()) {
             if (!player.hasPermission("polls.vote")) {
-                send("&c你没有投票权限。");
+                send(text("detail.message.no-permission"));
                 return;
             }
             if (votePending) return;
@@ -271,29 +285,29 @@ public class DetailGui implements Listener {
                 }
                 if (!voted) {
                     if (alreadyVoted) {
-                        send("&c你已经投过票了，不可更改。");
+                        send(text("detail.message.already-voted"));
                     } else if (fresh != null && !fresh.isActive()) {
-                        send("&c该议题已经结束。");
+                        send(text("detail.message.poll-ended"));
                     } else {
-                        send("&c该选项已失效，请重新打开界面。");
+                        send(text("detail.message.option-invalid"));
                     }
                     if (fresh != null && isViewing()) populate();
                     return;
                 }
                 if (fresh == null) {
-                    send("&c投票结果刷新失败，请重新打开界面。");
+                    send(text("detail.message.refresh-failed"));
                     return;
                 }
-                send("&a已投票：&f" + chosen.getLabel());
+                send(text("detail.message.vote-success", "option", chosen.getLabel()));
                 if (isViewing()) {
                     populate();
                 }
             });
         } catch (Exception e) {
-            plugin.getLogger().severe("投票失败: " + e.getMessage());
+            plugin.getLogger().severe(text("log.vote_failed", "error", e.getMessage()));
             plugin.getPlatformAdapter().runForPlayer(player, () -> {
                 votePending = false;
-                send("&c投票失败，请稍后再试。");
+                send(text("detail.message.vote-failed"));
             });
         }
     }
@@ -334,5 +348,9 @@ public class DetailGui implements Listener {
         removeCacheListener.run();
         removeCacheListener = () -> {};
         HandlerList.unregisterAll(this);
+    }
+
+    private String text(String key, String... replacements) {
+        return plugin.getLanguageManager().text(key, replacements);
     }
 }
