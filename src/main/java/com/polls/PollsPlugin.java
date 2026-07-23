@@ -15,6 +15,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,8 +33,18 @@ public class PollsPlugin extends JavaPlugin implements CommandExecutor {
     public void onEnable() {
         saveDefaultConfig();
         getDataFolder().mkdirs();
+        boolean configChanged = false;
         if (!getConfig().contains("language", true)) {
             getConfig().set("language", LanguageManager.DEFAULT_LANGUAGE);
+            configChanged = true;
+        }
+        if (!getConfig().contains("submit-templates", true)) {
+            getConfig().set("submit-templates.enabled", true);
+            getConfig().set("submit-templates.available", List.of("normal", "rental", "loan"));
+            getConfig().set("submit-templates.prefill-options", true);
+            configChanged = true;
+        }
+        if (configChanged) {
             saveConfig();
         }
         languageManager = new LanguageManager(this);

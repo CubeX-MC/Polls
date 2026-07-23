@@ -15,6 +15,9 @@
 - 纯民意收集，不执行任何游戏操作
 - 数据 SQLite 持久化，保存 30 天后自动清理
 - 内置简体中文和英文，可通过配置文件切换
+- 创建议题支持普通、出租和贷款模板，出租/贷款模板会预填同意与拒绝选项
+
+出租和贷款模板只是投票预设，不会自动转移物品、扣款或创建借贷合同。
 
 ---
 
@@ -52,14 +55,16 @@
 
 ### 提交议题
 1. 主界面右下角点击"提交新议题"
-2. 在聊天框依次输入：
+2. 选择普通投票、出租议题或贷款议题模板
+3. 在聊天框依次输入：
    - 议题标题
    - 议题描述（输入 `skip` 跳过）
    - 截止时长，格式：`30m` / `12h` / `3d` / `7d`
-3. 弹出选项管理界面，逐个添加选项
+4. 弹出选项管理界面，逐个添加选项
    - 每个选项需填写名称和描述（输入 `skip` 跳过描述）
+   - 出租和贷款模板会预填两个选项，可按需删除或继续添加
    - 至少添加 2 个选项，最多 9 个
-4. 点击"完成提交"
+5. 点击"完成提交"
 
 ![聊天框输入提示](images/20260714-045832.jpg)
 
@@ -83,6 +88,12 @@
 ```yaml
 # 界面语言：zh_CN（简体中文）或 en_US（English）
 language: zh_CN
+
+# 创建模板 / Poll creation templates
+submit-templates:
+  enabled: true
+  available: [normal, rental, loan]
+  prefill-options: true
 
 # 投票数据保留天数（最小为 1）
 data-retention-days: 30
@@ -108,6 +119,7 @@ max-option-desc-length: 100
 
 首次启动后可编辑 `plugins/Polls/lang/zh_CN.yml` 和 `plugins/Polls/lang/en_US.yml`。
 从旧版本升级时，插件会自动补入 `language: zh_CN`；修改语言后需重启服务器。
+将 `submit-templates.enabled` 设为 `false` 可跳过模板选择；`available` 可限制显示的模板。
 
 ---
 

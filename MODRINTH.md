@@ -36,6 +36,11 @@ Players can browse polls, inspect live results, and vote through an inventory GU
   **多平台调度：** Paper 和 Folia 使用区域调度 API，Bukkit 与 Spigot 使用兼容调度器。
 - **Built-in languages:** Switch between English (`en_US`) and Simplified Chinese (`zh_CN`) in `config.yml`.<br>
   **内置语言：** 可在 `config.yml` 中切换英文（`en_US`）和简体中文（`zh_CN`）。
+- **Creation templates:** Start a normal, rental, or loan proposal with localized approve/reject choices prefilled for the latter two.<br>
+  **创建模板：** 可选择普通、出租或贷款模板，后两者会预填本地化的同意/拒绝选项。
+
+These templates only prefill a poll. They do not transfer items, charge money, or create a rental/loan contract.<br>
+这些模板只预填投票内容，不会自动转移物品、扣款或创建出租/贷款合同。
 
 ---
 
@@ -80,13 +85,14 @@ Poll creators can add, review, or remove options before submitting the poll. At 
 ### Create a poll / 创建议题
 
 1. Click **Create Poll** in the bottom-right corner of the main interface.
-2. Enter the title, description, and duration in chat. Supported examples include `30m`, `12h`, and `3d`.
-3. Add 2 to 9 options and optional descriptions.
-4. Confirm the poll in the option editor.
+2. Choose the normal, rental, or loan template.
+3. Enter the title, description, and duration in chat. Supported examples include `30m`, `12h`, and `3d`.
+4. Add, remove, or review 2 to 9 options. Rental and loan templates start with approve/reject choices.
+5. Confirm the poll in the option editor.
 
 The guided setup captures every input privately before publishing the poll.
 
-中文说明：点击主界面右下角的“提交新议题”，按聊天提示填写标题、描述、截止时长与选项，最后在选项管理界面确认提交。所有输入均为私密输入。
+中文说明：点击主界面右下角的“提交新议题”，先选择普通、出租或贷款模板，再按聊天提示填写标题、描述、截止时长与选项，最后在选项管理界面确认提交。所有输入均为私密输入。
 
 ---
 
@@ -142,6 +148,12 @@ The platform adapter is selected automatically. On Folia, the plugin fails safel
 # Interface language: en_US or zh_CN / 界面语言
 language: zh_CN
 
+# Poll creation templates / 创建模板
+submit-templates:
+  enabled: true
+  available: [normal, rental, loan]
+  prefill-options: true
+
 # Days to retain ended polls / 投票结束后保留数据的天数
 data-retention-days: 30
 
@@ -160,6 +172,8 @@ max-option-desc-length: 100
 
 Editable language files are created at `plugins/Polls/lang/zh_CN.yml` and `plugins/Polls/lang/en_US.yml` on first startup. Existing installations receive `language: zh_CN` automatically; restart the server after changing it.<br>
 首次启动后会生成可编辑的 `plugins/Polls/lang/zh_CN.yml` 与 `plugins/Polls/lang/en_US.yml`。旧版本升级时会自动补入 `language: zh_CN`；修改后请重启服务器。
+Set `submit-templates.enabled` to `false` to skip the template menu, or narrow `available` to the templates you want to show.<br>
+将 `submit-templates.enabled` 设为 `false` 可跳过模板菜单，也可以通过 `available` 限制显示的模板。
 
 ---
 

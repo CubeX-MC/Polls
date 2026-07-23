@@ -31,7 +31,7 @@ main:
     ended: '&7▶ Ended'
   submit:
     name: '&e+ Submit a Poll'
-    lore: '&7Click to create a new poll'
+    lore: '&7Click to choose a template and create a poll'
   pagination:
     previous: '&ePrevious Page'
     indicator: '&fPage {page} / {pages}'
@@ -151,6 +151,33 @@ manage:
     deleted: '&aPoll deleted.'
 
 submit:
+  templates:
+    title: '&8[ &6Choose a Poll Template &8]'
+    filler: '&8 '
+    select: '&eClick to use this template'
+    prefill-lore: '&7Approve/reject choices will be prefilled'
+    back: '&7← Back to Polls'
+    normal:
+      name: '&fNormal Poll'
+      lore: '&7Create a poll with your own choices'
+    rental:
+      name: '&aRental Proposal'
+      lore: '&7Collect opinions about a rental proposal'
+      prompt:
+        title: '&eEnter the rental proposal &6title&e (maximum {max} characters)'
+        description: '&eEnter rental details such as the item, price, deposit and term, or type &fskip &eto skip'
+      options:
+        approve: 'Approve the rental'
+        reject: 'Reject the rental'
+    loan:
+      name: '&6Loan Proposal'
+      lore: '&7Collect opinions about a loan proposal'
+      prompt:
+        title: '&eEnter the loan proposal &6title&e (maximum {max} characters)'
+        description: '&eEnter loan details such as the amount, repayment period, interest or collateral, or type &fskip &eto skip'
+      options:
+        approve: 'Approve the loan'
+        reject: 'Reject the loan'
   prompt:
     title: '&eEnter the poll &6title&e (maximum {max} characters)'
     cancel: '&7Type &ccancel &7to cancel'

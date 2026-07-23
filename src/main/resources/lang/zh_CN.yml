@@ -31,7 +31,7 @@ main:
     ended: '&7▶ 已结束'
   submit:
     name: '&e+ 提交新议题'
-    lore: '&7点击发起一个新的投票议题'
+    lore: '&7点击选择模板并创建投票议题'
   pagination:
     previous: '&e上一页'
     indicator: '&f第 {page} / {pages} 页'
@@ -151,6 +151,33 @@ manage:
     deleted: '&a议题已删除。'
 
 submit:
+  templates:
+    title: '&8[ &6选择议题模板 &8]'
+    filler: '&8 '
+    select: '&e点击使用此模板'
+    prefill-lore: '&7将预填同意/拒绝选项'
+    back: '&7← 返回议题列表'
+    normal:
+      name: '&f普通投票'
+      lore: '&7创建并自行添加投票选项'
+    rental:
+      name: '&a出租议题'
+      lore: '&7针对出租方案征集玩家意见'
+      prompt:
+        title: '&e请输入出租议题&6标题&e（最多 {max} 字）'
+        description: '&e请输入出租物、价格、押金和期限等详情，输入 &fskip &e跳过'
+      options:
+        approve: '同意出租'
+        reject: '不同意出租'
+    loan:
+      name: '&6贷款议题'
+      lore: '&7针对贷款方案征集玩家意见'
+      prompt:
+        title: '&e请输入贷款议题&6标题&e（最多 {max} 字）'
+        description: '&e请输入金额、还款期限、利息或抵押等详情，输入 &fskip &e跳过'
+      options:
+        approve: '同意贷款'
+        reject: '不同意贷款'
   prompt:
     title: '&e请在聊天框输入议题&6标题&e（最多 {max} 字）'
     cancel: '&7输入 &ccancel &7取消'
